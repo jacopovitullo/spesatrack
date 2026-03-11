@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpesaTrack</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      SpesaTrack
+      <span>Personal Finance</span>
+    </div>
+
+    <nav>
+      <div class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">📊</span>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item" data-page="spese">
+        <span class="nav-icon">💳</span>
+        <span>Spese</span>
+      </div>
+      <div class="nav-item" data-page="query">
+        <span class="nav-icon">🔍</span>
+        <span>Query avanzate</span>
+      </div>
+      <div class="nav-item" data-page="esporta">
+        <span class="nav-icon">📤</span>
+        <span>Esporta</span>
+      </div>
+      <div class="nav-item" data-page="configurazione">
+        <span class="nav-icon">⚙️</span>
+        <span>Configurazione</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ── MAIN ────────────────────────────────────────── -->
+  <div class="main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">Dashboard</div>
+      <div class="topbar-actions">
+        <!-- Navigazione mese -->
+        <div class="month-nav">
+          <button id="btn-prev-month">‹</button>
+          <span id="label-mese">—</span>
+          <button id="btn-next-month">›</button>
+        </div>
+        <button class="btn btn-secondary" id="btn-bot">🤖 Bot</button>
+        <button class="btn btn-primary" id="btn-nuova-spesa">+ Spesa</button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+
+      <!-- ── DASHBOARD ─────────────────────────────── -->
+      <div class="page active" id="page-dashboard">
+
+        <!-- KPI -->
+        <div class="kpi-grid" id="kpi-container">
+          <!-- Popolato da JS -->
+          <div class="kpi-card"><div class="loading"><div class="spinner"></div></div></div>
+          <div class="kpi-card"><div class="loading"><div class="spinner"></div></div></div>
+          <div class="kpi-card"><div class="loading"><div class="spinner"></div></div></div>
+          <div class="kpi-card"><div class="loading"><div class="spinner"></div></div></div>
+        </div>
+
+        <!-- Grafici -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-title">Andamento giornaliero</div>
+            <div class="chart-container">
+              <canvas id="chart-bar"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Per categoria</div>
+            <div class="chart-container">
+              <canvas id="chart-doughnut"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ultime spese -->
+        <div class="table-card">
+          <div class="table-header">
+            <h3>Ultime spese</h3>
+            <button class="btn btn-ghost btn-sm" onclick="document.querySelector('[data-page=spese]').click()">
+              Vedi tutte →
+            </button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descrizione</th>
+                <th>Categoria</th>
+                <th>Importo</th>
+                <th>Fonte</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-ultime">
+              <tr><td colspan="5"><div class="loading"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── SPESE ─────────────────────────────────── -->
+      <div class="page" id="page-spese">
+        <div class="filters-bar">
+          <input type="text" id="filtro-testo" class="filter-input" placeholder="🔍 Cerca descrizione..." />
+          <select id="filtro-categoria" class="filter-select">
+            <option value="">Tutte le categorie</option>
+          </select>
+          <select id="filtro-periodo" class="filter-select">
+            <option value="">Questo mese</option>
+            <option value="settimana">Questa settimana</option>
+            <option value="mese">Mese corrente</option>
+            <option value="tre-mesi">Ultimi 3 mesi</option>
+            <option value="tutto">Tutto lo storico</option>
+          </select>
+        </div>
+
+        <div class="table-card">
+          <table>
+            <thead>
+              <tr>
+                <th data-col="data">Data</th>
+                <th data-col="descrizione">Descrizione</th>
+                <th>Categoria</th>
+                <th data-col="importo">Importo</th>
+                <th>Fonte</th>
+                <th>Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-spese">
+              <tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+          <div class="pagination" id="paginazione"></div>
+        </div>
+      </div>
+
+      <!-- ── QUERY AVANZATE ─────────────────────────── -->
+      <div class="page" id="page-query">
+        <div class="query-form card">
+          <div class="section-header" style="margin-bottom:16px">
+            <div class="section-title">Query avanzata</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Data da</label>
+              <input type="date" id="query-data-da" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Data a</label>
+              <input type="date" id="query-data-a" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Importo min (€)</label>
+              <input type="number" id="query-importo-min" class="form-input" placeholder="0" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Importo max (€)</label>
+              <input type="number" id="query-importo-max" class="form-input" placeholder="9999" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Testo libero</label>
+              <input type="text" id="query-testo" class="form-input" placeholder="Cerca nella descrizione..." />
+            </div>
+            <div class="form-group">
+              <label>Fonte</label>
+              <select id="query-fonte" class="form-select">
+                <option value="">Tutte</option>
+                <option value="web">🌐 Web</option>
+                <option value="telegram">🤖 Telegram</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Categoria</label>
+              <select id="query-categoria" class="form-select">
+                <option value="">Tutte</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px">
+            <button class="btn btn-primary" id="btn-esegui-query">▶ Esegui query</button>
+            <button class="btn btn-secondary" id="btn-salva-query">💾 Salva query</button>
+          </div>
+        </div>
+
+        <div id="query-risultati" style="margin-bottom:16px"></div>
+
+        <div class="saved-queries">
+          <div class="section-header">
+            <div class="section-title" style="font-size:14px">Query salvate</div>
+          </div>
+          <div id="query-salvate"></div>
+        </div>
+      </div>
+
+      <!-- ── ESPORTA ────────────────────────────────── -->
+      <div class="page" id="page-esporta">
+        <div style="margin-bottom:20px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="export-tutto" />
+            Esporta tutto lo storico (ignora il mese selezionato)
+          </label>
+          <div style="margin-top:10px;font-size:13px;color:var(--text2)">
+            Periodo corrente: <strong id="export-periodo-label">—</strong>
+          </div>
+        </div>
+
+        <div class="export-grid">
+          <div class="export-card">
+            <div class="export-icon">📄</div>
+            <div class="export-title">CSV</div>
+            <div class="export-desc">File testo separato da virgole, compatibile con Excel e Google Sheets</div>
+            <button class="btn btn-secondary btn-export" data-tipo="csv">Scarica CSV</button>
+          </div>
+          <div class="export-card">
+            <div class="export-icon">📊</div>
+            <div class="export-title">Excel</div>
+            <div class="export-desc">File .xlsx con formattazione, colori e riga totale automatica</div>
+            <button class="btn btn-secondary btn-export" data-tipo="excel">Scarica Excel</button>
+          </div>
+          <div class="export-card">
+            <div class="export-icon">📑</div>
+            <div class="export-title">PDF</div>
+            <div class="export-desc">Report PDF pronto per la stampa con tabella e totali</div>
+            <button class="btn btn-secondary btn-export" data-tipo="pdf">Scarica PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── CONFIGURAZIONE ─────────────────────────── -->
+      <div class="page" id="page-configurazione">
+
+        <!-- Preferenze generali -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-header">
+            <div class="section-title">Preferenze generali</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Valuta (codice)</label>
+              <input type="text" id="cfg-valuta" class="form-input" placeholder="EUR" maxlength="5" />
+            </div>
+            <div class="form-group">
+              <label>Simbolo valuta</label>
+              <input type="text" id="cfg-simbolo" class="form-input" placeholder="€" maxlength="3" />
+            </div>
+            <div class="form-group form-full">
+              <label>Budget mensile globale (€)</label>
+              <input type="number" id="cfg-budget" class="form-input" min="0" step="10" />
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-primary" id="btn-salva-app-config">Salva impostazioni</button>
+          </div>
+        </div>
+
+        <!-- Categorie -->
+        <div class="card">
+          <div class="section-header">
+            <div class="section-title">Categorie</div>
+            <button class="btn btn-primary btn-sm" id="btn-nuova-categoria">+ Nuova</button>
+          </div>
+          <div id="lista-categorie">
+            <div class="loading"><div class="spinner"></div> Caricamento...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── TOAST ──────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<!-- ── MODAL NUOVA SPESA ──────────────────────────────── -->
+<div class="modal-overlay" id="modal-spesa">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-spesa-titolo">Nuova spesa</div>
+      <button class="modal-close" id="btn-chiudi-spesa">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Importo (€) *</label>
+          <input type="number" id="spesa-importo" class="form-input" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="spesa-data" class="form-input" />
+        </div>
+        <div class="form-group form-full">
+          <label>Descrizione *</label>
+          <input type="text" id="spesa-descrizione" class="form-input" placeholder="Es. caffè al bar..." />
+        </div>
+        <div class="form-group form-full">
+          <label>Categoria</label>
+          <select id="spesa-categoria" class="form-select">
+            <option value="">Seleziona categoria...</option>
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label>Note</label>
+          <textarea id="spesa-note" class="form-textarea" placeholder="Note opzionali..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-spesa">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-spesa">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL CATEGORIA ────────────────────────────────── -->
+<div class="modal-overlay" id="modal-categoria">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-cat-titolo">Nuova categoria</div>
+      <button class="modal-close" id="btn-chiudi-cat">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat-id-hidden" />
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Nome *</label>
+          <input type="text" id="cat-nome" class="form-input" placeholder="Es. Cibo, Trasporti..." />
+        </div>
+        <div class="form-group">
+          <label>Icona (emoji)</label>
+          <input type="text" id="cat-icona" class="form-input" placeholder="🍕" maxlength="4" />
+        </div>
+        <div class="form-group">
+          <label>Colore</label>
+          <input type="color" id="cat-colore" class="form-input" value="#c8ff00" style="padding:4px;height:42px" />
+        </div>
+        <div class="form-group form-full">
+          <label>Budget mensile (€)</label>
+          <input type="number" id="cat-budget" class="form-input" min="0" step="10" value="0" />
+        </div>
+        <div class="form-group form-full">
+          <label>Regole auto-categorizzazione (virgola separato)</label>
+          <input type="text" id="cat-regole" class="form-input" placeholder="supermercato, lidl, pane, caffè..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-cat">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-categoria">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL BOT TELEGRAM ─────────────────────────────── -->
+<div class="modal-overlay" id="modal-bot">
+  <div class="modal" style="width:580px">
+    <div class="modal-header">
+      <div class="modal-title">🤖 Bot Telegram</div>
+      <button class="modal-close" id="btn-chiudi-bot">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Status -->
+      <div class="bot-status-bar">
+        <span class="status-dot offline" id="bot-status-dot"></span>
+        <span id="bot-status-label">Verifica stato...</span>
+      </div>
+
+      <!-- Token -->
+      <div class="form-group" style="margin-bottom:16px">
+        <label>Bot Token</label>
+        <div class="token-input-group">
+          <input type="password" id="bot-token" class="form-input" placeholder="1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ..." />
+          <button class="btn btn-ghost" id="btn-toggle-token">👁</button>
+        </div>
+      </div>
+
+      <!-- Chat ID -->
+      <div class="form-group" style="margin-bottom:20px">
+        <label>Chat ID</label>
+        <input type="text" id="bot-chat-id" class="form-input" placeholder="Es. 123456789" />
+      </div>
+
+      <!-- Comandi -->
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--text2)">
+        <strong style="color:var(--text);display:block;margin-bottom:8px">Comandi disponibili:</strong>
+        /oggi · /settimana · /mese · /budget · /lista · /cancella · /cerca &lt;testo&gt;
+      </div>
+
+      <!-- Notifiche -->
+      <div style="margin-bottom:16px">
+        <strong style="font-size:13px;display:block;margin-bottom:8px">Notifiche</strong>
+
+        <div class="toggle-group">
+          <div>
+            <div class="toggle-label">Riepilogo giornaliero</div>
+            <div class="toggle-sub">Inviato automaticamente ogni sera</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-notif-giornaliera" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-group">
+          <div>
+            <div class="toggle-label">Riepilogo settimanale</div>
+            <div class="toggle-sub">Ogni lunedì mattina</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-notif-settimanale" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-group">
+          <div>
+            <div class="toggle-label">Alert superamento budget</div>
+            <div class="toggle-sub">Avviso quando una categoria supera il budget</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-alert-budget" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-group">
+          <div>
+            <div class="toggle-label">Conferma inserimento</div>
+            <div class="toggle-sub">Messaggio di conferma dopo ogni spesa</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-conferma" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Formato riepilogo -->
+      <div>
+        <strong style="font-size:13px;display:block;margin-bottom:8px">Formato riepilogo /mese</strong>
+        <div class="formato-options">
+          <div class="formato-btn" data-formato="compatto">
+            <strong>Compatto</strong>
+            <div style="font-size:10px;margin-top:2px;opacity:0.7">Totale + variazione</div>
+          </div>
+          <div class="formato-btn active" data-formato="dettagliato">
+            <strong>Dettagliato</strong>
+            <div style="font-size:10px;margin-top:2px;opacity:0.7">Per categoria</div>
+          </div>
+          <div class="formato-btn" data-formato="completo">
+            <strong>Completo</strong>
+            <div style="font-size:10px;margin-top:2px;opacity:0.7">+ lista spese</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-chiudi-bot-footer"
+        onclick="document.getElementById('modal-bot').classList.remove('active')">Chiudi</button>
+      <button class="btn btn-primary" id="btn-salva-bot">Salva configurazione</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
