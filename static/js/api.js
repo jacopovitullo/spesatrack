@@ -84,6 +84,71 @@ export async function setAppConfig(data) {
   return request('PUT', '/config/app', data);
 }
 
+// ── Statistiche annuali ───────────────────────────────────────────
+
+export async function getStatisticheAnnuali(anno) {
+  return request('GET', `/statistiche/annuali?anno=${anno}`);
+}
+
+export async function getStatisticheAnnualiEntrate(anno) {
+  return request('GET', `/entrate/statistiche/annuali?anno=${anno}`);
+}
+
+export async function getTotaliEntrate(anno) {
+  return request('GET', `/entrate/totali?anno=${anno}`);
+}
+
+// ── Entrate ───────────────────────────────────────────────────────
+
+export async function getEntrate(params = {}) {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v !== null && v !== '' && v !== undefined)
+  ).toString();
+  return request('GET', `/entrate${qs ? '?' + qs : ''}`);
+}
+
+export async function creaEntrata(data) {
+  return request('POST', '/entrate', data);
+}
+
+export async function modificaEntrata(id, data) {
+  return request('PUT', `/entrate/${id}`, data);
+}
+
+export async function eliminaEntrata(id) {
+  return request('DELETE', `/entrate/${id}`);
+}
+
+// ── Abbonamenti ───────────────────────────────────────────────────
+
+export async function getAbbonamenti(soloAttivi = false) {
+  return request('GET', `/abbonamenti${soloAttivi ? '?attivi=1' : ''}`);
+}
+
+export async function creaAbbonamento(data) {
+  return request('POST', '/abbonamenti', data);
+}
+
+export async function modificaAbbonamento(id, data) {
+  return request('PUT', `/abbonamenti/${id}`, data);
+}
+
+export async function eliminaAbbonamento(id) {
+  return request('DELETE', `/abbonamenti/${id}`);
+}
+
+export async function disattivaAbbonamento(id) {
+  return request('PUT', `/abbonamenti/${id}/disattiva`);
+}
+
+export async function addebitaAbbonamento(id) {
+  return request('POST', `/abbonamenti/${id}/addebita`);
+}
+
+export async function riativaAbbonamento(id, payload) {
+  return request('PUT', `/abbonamenti/${id}/riattiva`, payload);
+}
+
 // ── Export ────────────────────────────────────────────────────────
 
 export function downloadExport(tipo, mese, anno, tutto = false) {

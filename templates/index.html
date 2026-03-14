@@ -31,6 +31,14 @@
         <span class="nav-icon">🔍</span>
         <span>Query avanzate</span>
       </div>
+      <div class="nav-item" data-page="entrate">
+        <span class="nav-icon">💰</span>
+        <span>Entrate</span>
+      </div>
+      <div class="nav-item" data-page="abbonamenti">
+        <span class="nav-icon">🔄</span>
+        <span>Abbonamenti</span>
+      </div>
       <div class="nav-item" data-page="esporta">
         <span class="nav-icon">📤</span>
         <span>Esporta</span>
@@ -47,6 +55,7 @@
 
     <!-- Topbar -->
     <header class="topbar">
+      <button id="btn-hamburger" class="btn btn-ghost btn-sm" style="display:none;font-size:18px;padding:4px 10px">☰</button>
       <div class="topbar-title">Dashboard</div>
       <div class="topbar-actions">
         <!-- Navigazione mese -->
@@ -75,10 +84,31 @@
           <div class="kpi-card"><div class="loading"><div class="spinner"></div></div></div>
         </div>
 
+        <!-- Budget bar -->
+        <div class="budget-section card" id="budget-section" style="display:none">
+          <div class="budget-header">
+            <span class="budget-title">Budget mensile</span>
+            <span id="budget-label-importi" style="font-size:13px;color:var(--text2)"></span>
+          </div>
+          <div class="budget-bar-track">
+            <div class="budget-bar-fill" id="budget-bar-fill"></div>
+          </div>
+          <div class="budget-footer">
+            <span id="budget-label-perc" style="font-size:12px;color:var(--text2)"></span>
+            <span id="budget-label-rimanente" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+        </div>
+
         <!-- Grafici -->
         <div class="charts-grid">
           <div class="chart-card">
-            <div class="chart-title">Andamento giornaliero</div>
+            <div class="chart-title-row">
+              <span class="chart-title">Andamento</span>
+              <div class="chart-tabs">
+                <button class="chart-tab active" data-view="mensile">Mensile</button>
+                <button class="chart-tab" data-view="annuale">Annuale</button>
+              </div>
+            </div>
             <div class="chart-container">
               <canvas id="chart-bar"></canvas>
             </div>
@@ -196,9 +226,20 @@
               </select>
             </div>
           </div>
-          <div style="display:flex;gap:10px;margin-top:16px">
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-primary" id="btn-esegui-query">▶ Esegui query</button>
             <button class="btn btn-secondary" id="btn-salva-query">💾 Salva query</button>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-left:8px">
+              <input type="checkbox" id="query-flag-grafico" />
+              📊 Mostra grafico
+            </label>
+          </div>
+        </div>
+
+        <div id="query-chart-container" style="display:none;margin-bottom:16px">
+          <div class="chart-card">
+            <div class="chart-title">Spese per giorno</div>
+            <div class="chart-container"><canvas id="chart-query"></canvas></div>
           </div>
         </div>
 
@@ -209,6 +250,86 @@
             <div class="section-title" style="font-size:14px">Query salvate</div>
           </div>
           <div id="query-salvate"></div>
+        </div>
+      </div>
+
+      <!-- ── ENTRATE ────────────────────────────────── -->
+      <div class="page" id="page-entrate">
+        <!-- KPI entrate -->
+        <div class="kpi-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
+          <div class="kpi-card">
+            <div class="kpi-label">Entrate anno corrente</div>
+            <div class="kpi-value" id="kpi-entrate-anno">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Totale storico entrate</div>
+            <div class="kpi-value" id="kpi-entrate-storico">—</div>
+          </div>
+        </div>
+
+        <!-- Grafico annuale entrate -->
+        <div class="chart-card" style="margin-bottom:20px">
+          <div class="chart-title-row">
+            <span class="chart-title">Entrate annuali</span>
+            <span id="entrate-anno-label" style="color:var(--text2);font-size:13px"></span>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-bar-entrate"></canvas>
+          </div>
+        </div>
+
+        <div class="filters-bar">
+          <input type="text" id="entrate-filtro-testo" class="filter-input" placeholder="🔍 Cerca descrizione..." />
+          <select id="entrate-filtro-tipo" class="filter-select">
+            <option value="">Tutti i tipi</option>
+            <option value="stipendio">Stipendio</option>
+            <option value="freelance">Freelance</option>
+            <option value="rimborso">Rimborso</option>
+            <option value="bonus">Bonus</option>
+            <option value="altro">Altro</option>
+          </select>
+        </div>
+        <div class="table-card">
+          <div class="table-header">
+            <h3>Entrate</h3>
+            <button class="btn btn-primary btn-sm" id="btn-nuova-entrata">+ Entrata</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descrizione</th>
+                <th>Tipo</th>
+                <th>Importo</th>
+                <th>Note</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-entrate">
+              <tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── ABBONAMENTI ─────────────────────────────── -->
+      <div class="page" id="page-abbonamenti">
+        <!-- KPI costo mensile abbonamenti -->
+        <div class="kpi-card" style="margin-bottom:16px;max-width:260px">
+          <div class="kpi-label">Costo mensile abbonamenti</div>
+          <div class="kpi-value" id="abb-totale-mensile">—</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div class="abbonamenti-tabs">
+            <button class="abb-tab active" data-tipo="tutti">Tutti</button>
+            <button class="abb-tab" data-tipo="abbonamento">Abbonamenti</button>
+            <button class="abb-tab" data-tipo="rata">Rate</button>
+            <button class="abb-tab" data-tipo="completate">Completate</button>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-nuovo-abbonamento">+ Nuovo</button>
+        </div>
+        <div id="lista-abbonamenti">
+          <div class="loading"><div class="spinner"></div> Caricamento...</div>
         </div>
       </div>
 
@@ -386,21 +507,6 @@
         <span id="bot-status-label">Verifica stato...</span>
       </div>
 
-      <!-- Token -->
-      <div class="form-group" style="margin-bottom:16px">
-        <label>Bot Token</label>
-        <div class="token-input-group">
-          <input type="password" id="bot-token" class="form-input" placeholder="1234567890:ABCdefGHIjklMNOpqrSTUvwxYZ..." />
-          <button class="btn btn-ghost" id="btn-toggle-token">👁</button>
-        </div>
-      </div>
-
-      <!-- Chat ID -->
-      <div class="form-group" style="margin-bottom:20px">
-        <label>Chat ID</label>
-        <input type="text" id="bot-chat-id" class="form-input" placeholder="Es. 123456789" />
-      </div>
-
       <!-- Comandi -->
       <div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:20px;font-size:12px;color:var(--text2)">
         <strong style="color:var(--text);display:block;margin-bottom:8px">Comandi disponibili:</strong>
@@ -479,6 +585,139 @@
       <button class="btn btn-ghost" id="btn-chiudi-bot-footer"
         onclick="document.getElementById('modal-bot').classList.remove('active')">Chiudi</button>
       <button class="btn btn-primary" id="btn-salva-bot">Salva configurazione</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL NUOVA ENTRATA ───────────────────────────── -->
+<div class="modal-overlay" id="modal-entrata">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-entrata-titolo">Nuova entrata</div>
+      <button class="modal-close" id="btn-chiudi-entrata">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Importo (€) *</label>
+          <input type="number" id="entrata-importo" class="form-input" placeholder="0.00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Data *</label>
+          <input type="date" id="entrata-data" class="form-input" />
+        </div>
+        <div class="form-group form-full">
+          <label>Descrizione *</label>
+          <input type="text" id="entrata-descrizione" class="form-input" placeholder="Es. Stipendio maggio..." />
+        </div>
+        <div class="form-group form-full">
+          <label>Tipo</label>
+          <select id="entrata-tipo" class="form-select">
+            <option value="stipendio">Stipendio</option>
+            <option value="freelance">Freelance</option>
+            <option value="rimborso">Rimborso</option>
+            <option value="bonus">Bonus</option>
+            <option value="altro">Altro</option>
+          </select>
+        </div>
+        <div class="form-group form-full">
+          <label>Note</label>
+          <textarea id="entrata-note" class="form-textarea" placeholder="Note opzionali..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-entrata">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-entrata">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ABBONAMENTO / RATA ──────────────────────── -->
+<div class="modal-overlay" id="modal-abbonamento">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-abb-titolo">Nuovo abbonamento</div>
+      <button class="modal-close" id="btn-chiudi-abb">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="abb-id-hidden" />
+      <div class="form-grid">
+        <div class="form-group form-full">
+          <label>Descrizione *</label>
+          <input type="text" id="abb-descrizione" class="form-input" placeholder="Es. Netflix, Mutuo..." />
+        </div>
+        <div class="form-group">
+          <label>Importo (€) *</label>
+          <input type="number" id="abb-importo" class="form-input" placeholder="0.00" min="0" step="0.01" />
+          <div id="abb-importo-helper" style="font-size:12px;color:var(--text2);margin-top:4px;display:none">
+            Importo per rata: <strong id="abb-rata-calc">—</strong>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="abb-tipo" class="form-select">
+            <option value="abbonamento">Abbonamento</option>
+            <option value="rata">Rata</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequenza</label>
+          <select id="abb-frequenza" class="form-select">
+            <option value="mensile">Mensile</option>
+            <option value="annuale">Annuale</option>
+            <option value="settimanale">Settimanale</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Giorno addebito</label>
+          <input type="number" id="abb-giorno" class="form-input" min="1" max="31" value="1" />
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="abb-categoria" class="form-select">
+            <option value="">Nessuna</option>
+          </select>
+        </div>
+        <div class="form-group form-full" id="abb-rate-group" style="display:none">
+          <label>Numero rate totali</label>
+          <input type="number" id="abb-n-rate" class="form-input" min="1" placeholder="Es. 12" />
+        </div>
+        <div class="form-group form-full">
+          <label>Note</label>
+          <textarea id="abb-note" class="form-textarea" placeholder="Note opzionali..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-abb">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-abb">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL RIATTIVA ABBONAMENTO ─────────────────────────── -->
+<div class="modal-overlay" id="modal-riattiva">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Riattiva abbonamento</div>
+      <button class="modal-close" id="btn-chiudi-riattiva">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="riattiva-id" />
+      <div class="form-group">
+        <label>Giorno di addebito</label>
+        <input type="number" id="riattiva-giorno" class="form-input" min="1" max="31" value="1" />
+      </div>
+      <div class="form-group" id="riattiva-rate-group" style="display:none">
+        <label>Rate già pagate (riprendere da)</label>
+        <input type="number" id="riattiva-rate-pagate" class="form-input" min="0" value="0" />
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">Es. inserisci 3 se hai già pagato 3 rate</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-riattiva">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-riattiva">Riattiva</button>
     </div>
   </div>
 </div>

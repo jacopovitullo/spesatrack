@@ -4,12 +4,15 @@
 
 import {
   getSpese, creaSpesa, modificaSpesa, eliminaSpesa,
-  getStatistiche, getCategorie, creaCategoria, modificaCategoria, eliminaCategoria,
+  getStatistiche, getStatisticheAnnuali, getStatisticheAnnualiEntrate, getTotaliEntrate, getCategorie, creaCategoria, modificaCategoria, eliminaCategoria,
   getBotConfig, setBotConfig, getAppConfig, setAppConfig,
   downloadExport,
+  getEntrate, creaEntrata, modificaEntrata, eliminaEntrata,
+  getAbbonamenti, creaAbbonamento, modificaAbbonamento, eliminaAbbonamento,
+  disattivaAbbonamento, addebitaAbbonamento, riativaAbbonamento,
 } from './api.js';
 
-import { renderBarChart, renderDoughnutChart } from './charts.js';
+import { renderBarChart, renderAnnualChart, renderDoughnutChart, renderAnnualEntryChart, renderQueryChart } from './charts.js';
 
 // ─── Stato globale ────────────────────────────────────────────────
 
@@ -18,14 +21,21 @@ const state = {
   annoCorrente: new Date().getFullYear(),
   categorie: [],
   speseCorrente: [],
+  entrateCorrente: [],
+  abbonamentiCorrente: [],
   paginaCorrente: 1,
   righePerPagina: 20,
   ordinamento: { col: 'data', dir: 'desc' },
   filtriSpese: {},
+  filtriEntrate: {},
+  filtroTipoAbb: 'tutti',
   salvataggioQuery: [],
   appConfig: {},
   botConfig: {},
   spesaModifica: null,
+  entrataModifica: null,
+  abboModifica: null,
+  viewGrafico: 'mensile',
 };
 
 // ─── Utils ────────────────────────────────────────────────────────
@@ -79,9 +89,25 @@ document.querySelectorAll('.nav-item').forEach(item => {
 function onPageActivate(pageId) {
   if (pageId === 'dashboard') loadDashboard();
   if (pageId === 'spese') loadSpese();
+  if (pageId === 'entrate') loadEntrate();
+  if (pageId === 'abbonamenti') loadAbbonamenti();
   if (pageId === 'configurazione') loadConfigurazione();
   if (pageId === 'esporta') loadEsporta();
 }
+
+// ─── Hamburger mobile ─────────────────────────────────────────────
+
+document.getElementById('btn-hamburger')?.addEventListener('click', () => {
+  document.querySelector('.sidebar').classList.toggle('mobile-open');
+});
+
+document.addEventListener('click', (e) => {
+  const sidebar = document.querySelector('.sidebar');
+  const hamburger = document.getElementById('btn-hamburger');
+  if (sidebar?.classList.contains('mobile-open') && !sidebar.contains(e.target) && e.target !== hamburger) {
+    sidebar.classList.remove('mobile-open');
+  }
+});
 
 // ─── Navigazione mese ─────────────────────────────────────────────
 
@@ -104,6 +130,31 @@ function aggiornaLabelMese() {
   if (el) el.textContent = nomeMese(state.meseCorrente, state.annoCorrente);
 }
 
+// ─── Tab grafici ──────────────────────────────────────────────────
+
+document.querySelectorAll('.chart-tab').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.chart-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.viewGrafico = btn.dataset.view;
+    if (state.viewGrafico === 'annuale') {
+      try {
+        const annuali = await getStatisticheAnnuali(state.annoCorrente);
+        renderAnnualChart(annuali);
+      } catch (e) {
+        toast('Errore grafico annuale: ' + e.message, 'error');
+      }
+    } else {
+      try {
+        const stats = await getStatistiche(state.meseCorrente, state.annoCorrente);
+        renderBarChart(stats.per_giorno || []);
+      } catch (e) {
+        toast('Errore grafico mensile: ' + e.message, 'error');
+      }
+    }
+  });
+});
+
 // ─── DASHBOARD ────────────────────────────────────────────────────
 
 async function loadDashboard() {
@@ -111,11 +162,41 @@ async function loadDashboard() {
     loading('kpi-container');
     const stats = await getStatistiche(state.meseCorrente, state.annoCorrente);
     renderKPI(stats);
-    renderBarChart(stats.per_giorno || []);
+    renderBudgetBar(stats);
+    if (state.viewGrafico === 'annuale') {
+      const annuali = await getStatisticheAnnuali(state.annoCorrente);
+      renderAnnualChart(annuali);
+    } else {
+      renderBarChart(stats.per_giorno || []);
+    }
     renderDoughnutChart(stats.per_categoria || []);
     await loadUltimeSpese();
   } catch (e) {
     toast('Errore caricamento dashboard: ' + e.message, 'error');
+  }
+}
+
+function renderBudgetBar(stats) {
+  const section = document.getElementById('budget-section');
+  if (!section) return;
+  const totale = stats.totale_mese || 0;
+  const budget = stats.budget_globale || (totale + (stats.budget_rimanente || 0));
+  if (!budget) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  const perc = Math.min((totale / budget) * 100, 100);
+  const simbolo = state.appConfig.simbolo_valuta || '€';
+  const colore = perc < 70 ? 'var(--green)' : perc < 90 ? '#ffa502' : 'var(--red)';
+  const fill = document.getElementById('budget-bar-fill');
+  if (fill) { fill.style.width = perc + '%'; fill.style.background = colore; }
+  const elImporti = document.getElementById('budget-label-importi');
+  if (elImporti) elImporti.textContent = `${formatImporto(totale, simbolo)} / ${formatImporto(budget, simbolo)}`;
+  const elPerc = document.getElementById('budget-label-perc');
+  if (elPerc) elPerc.textContent = `${perc.toFixed(1)}% utilizzato`;
+  const elRim = document.getElementById('budget-label-rimanente');
+  if (elRim) {
+    const rim = stats.budget_rimanente || 0;
+    elRim.textContent = `Rimanente: ${formatImporto(rim, simbolo)}`;
+    elRim.style.color = rim < 0 ? 'var(--red)' : 'var(--green)';
   }
 }
 
@@ -437,6 +518,430 @@ window.confermaEliminaSpesa = async function(id, desc) {
   }
 };
 
+// ─── ENTRATE ──────────────────────────────────────────────────────
+
+async function loadEntrate() {
+  await fetchERenderEntrate();
+  const annuali = await getStatisticheAnnualiEntrate(state.annoCorrente);
+  renderAnnualEntryChart(annuali);
+  const label = document.getElementById('entrate-anno-label');
+  if (label) label.textContent = state.annoCorrente;
+  try {
+    const totali = await getTotaliEntrate(state.annoCorrente);
+    const kpiAnno = document.getElementById('kpi-entrate-anno');
+    const kpiStorico = document.getElementById('kpi-entrate-storico');
+    if (kpiAnno) kpiAnno.textContent = formatImporto(totali.totale_anno);
+    if (kpiStorico) kpiStorico.textContent = formatImporto(totali.totale_storico);
+  } catch { /* non critico */ }
+}
+
+async function fetchERenderEntrate() {
+  try {
+    const params = { ...state.filtriEntrate };
+    const entrate = await getEntrate(params);
+    state.entrateCorrente = entrate;
+    renderTabellaEntrate();
+  } catch (e) {
+    toast('Errore caricamento entrate: ' + e.message, 'error');
+  }
+}
+
+function renderTabellaEntrate() {
+  const tbody = document.getElementById('tbody-entrate');
+  if (!tbody) return;
+  if (!state.entrateCorrente.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-text">Nessuna entrata</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.entrateCorrente.map(e => `<tr>
+    <td>${formatData(e.data)}</td>
+    <td>${e.descrizione}</td>
+    <td><span class="badge" style="background:var(--surface2);color:var(--text2)">${e.tipo || 'altro'}</span></td>
+    <td class="importo" style="color:var(--green)">${formatImporto(e.importo)}</td>
+    <td style="color:var(--text2);font-size:12px">${e.note || ''}</td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="apriModificaEntrata('${e.id}')">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="confermaEliminaEntrata('${e.id}','${e.descrizione.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+document.getElementById('entrate-filtro-testo')?.addEventListener('input', debounce(e => {
+  if (e.target.value) state.filtriEntrate.q = e.target.value;
+  else delete state.filtriEntrate.q;
+  fetchERenderEntrate();
+}, 300));
+
+document.getElementById('entrate-filtro-tipo')?.addEventListener('change', e => {
+  if (e.target.value) state.filtriEntrate.tipo = e.target.value;
+  else delete state.filtriEntrate.tipo;
+  fetchERenderEntrate();
+});
+
+document.getElementById('btn-nuova-entrata')?.addEventListener('click', () => apriModalEntrata());
+
+async function apriModalEntrata(id = null) {
+  state.entrataModifica = id;
+  const modal = document.getElementById('modal-entrata');
+  document.getElementById('modal-entrata-titolo').textContent = id ? 'Modifica entrata' : 'Nuova entrata';
+
+  if (id) {
+    const e = state.entrateCorrente.find(x => x.id === id);
+    if (e) {
+      document.getElementById('entrata-importo').value = e.importo;
+      document.getElementById('entrata-data').value = e.data;
+      document.getElementById('entrata-descrizione').value = e.descrizione;
+      document.getElementById('entrata-tipo').value = e.tipo || 'altro';
+      document.getElementById('entrata-note').value = e.note || '';
+    }
+  } else {
+    document.getElementById('entrata-importo').value = '';
+    document.getElementById('entrata-data').value = new Date().toISOString().split('T')[0];
+    document.getElementById('entrata-descrizione').value = '';
+    document.getElementById('entrata-tipo').value = 'stipendio';
+    document.getElementById('entrata-note').value = '';
+  }
+  modal.classList.add('active');
+}
+
+window.apriModificaEntrata = apriModalEntrata;
+
+document.getElementById('modal-entrata')?.addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('modal-entrata').classList.remove('active');
+});
+document.getElementById('btn-chiudi-entrata')?.addEventListener('click', () =>
+  document.getElementById('modal-entrata').classList.remove('active'));
+document.getElementById('btn-annulla-entrata')?.addEventListener('click', () =>
+  document.getElementById('modal-entrata').classList.remove('active'));
+
+document.getElementById('btn-salva-entrata')?.addEventListener('click', async () => {
+  const importo = parseFloat(document.getElementById('entrata-importo').value);
+  const data = document.getElementById('entrata-data').value;
+  const descrizione = document.getElementById('entrata-descrizione').value.trim();
+  const tipo = document.getElementById('entrata-tipo').value;
+  const note = document.getElementById('entrata-note').value.trim();
+
+  if (!descrizione || isNaN(importo) || importo <= 0) {
+    toast('Inserisci descrizione e importo valido', 'error');
+    return;
+  }
+  try {
+    const payload = { descrizione, importo, data, tipo, note };
+    if (state.entrataModifica) {
+      await modificaEntrata(state.entrataModifica, payload);
+      toast('Entrata modificata', 'success');
+    } else {
+      await creaEntrata(payload);
+      toast('Entrata aggiunta', 'success');
+    }
+    document.getElementById('modal-entrata').classList.remove('active');
+    state.entrataModifica = null;
+    await fetchERenderEntrate();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+});
+
+window.confermaEliminaEntrata = async function(id, desc) {
+  if (!confirm(`Eliminare "${desc}"?`)) return;
+  try {
+    await eliminaEntrata(id);
+    toast('Entrata eliminata', 'success');
+    await fetchERenderEntrate();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+};
+
+// ─── ABBONAMENTI ──────────────────────────────────────────────────
+
+async function loadAbbonamenti() {
+  if (!state.categorie.length) state.categorie = await getCategorie();
+  await fetchERenderAbbonamenti();
+}
+
+async function fetchERenderAbbonamenti() {
+  try {
+    const tutti = await getAbbonamenti();
+    state.abbonamentiCorrente = tutti;
+    renderListaAbbonamenti();
+  } catch (e) {
+    toast('Errore caricamento abbonamenti: ' + e.message, 'error');
+  }
+}
+
+function renderListaAbbonamenti() {
+  const cont = document.getElementById('lista-abbonamenti');
+  if (!cont) return;
+
+  // KPI costo mensile abbonamenti attivi (escluso rate)
+  const soloAbb = state.abbonamentiCorrente.filter(a => a.attivo && a.tipo === 'abbonamento');
+  const totMensile = soloAbb.reduce((s, a) => s + parseFloat(a.importo), 0);
+  const kpiAbb = document.getElementById('abb-totale-mensile');
+  if (kpiAbb) kpiAbb.textContent = formatImporto(totMensile);
+
+  // Filtraggio per tab
+  let lista;
+  const filtro = state.filtroTipoAbb;
+  if (filtro === 'completate') {
+    lista = state.abbonamentiCorrente.filter(a =>
+      !a.attivo && a.tipo === 'rata' && a.n_rate_totali && (a.n_rate_pagate || 0) >= a.n_rate_totali
+    );
+  } else if (filtro === 'tutti') {
+    lista = state.abbonamentiCorrente.filter(a => a.attivo);
+  } else {
+    lista = state.abbonamentiCorrente.filter(a => a.attivo && a.tipo === filtro);
+  }
+
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔄</div><div class="empty-state-text">Nessun abbonamento</div></div>';
+    return;
+  }
+
+  const isCompletate = filtro === 'completate';
+
+  cont.innerHTML = lista.map(a => {
+    const cat = a.categorie || {};
+    const bg = cat.colore ? cat.colore + '22' : 'var(--surface2)';
+    const color = cat.colore || '#888';
+    const freqLabel = a.tipo === 'rata' ? ' totale' : ({ mensile: '/mese', annuale: '/anno', settimanale: '/sett.' }[a.frequenza] || '');
+    let rateInfo = '';
+    if (a.tipo === 'rata' && a.n_rate_totali) {
+      const perc = Math.min(100, Math.round(((a.n_rate_pagate || 0) / a.n_rate_totali) * 100));
+      const importoRata = parseFloat(a.importo) / parseInt(a.n_rate_totali);
+      const pagato = (a.n_rate_pagate || 0) * importoRata;
+      const totale = parseFloat(a.importo);
+      rateInfo = `<div class="rata-progress">
+        <div class="rata-label">${a.n_rate_pagate || 0} / ${a.n_rate_totali} rate — ${formatImporto(pagato)} / ${formatImporto(totale)}</div>
+        <div class="rata-bar-track"><div class="rata-bar-fill" style="width:${perc}%"></div></div>
+      </div>`;
+    }
+    const badgeCompletata = isCompletate
+      ? '<span class="badge abb-attivo" style="background:#00d4ff22;color:#00d4ff">✅ Completata</span>'
+      : `<span class="badge ${a.attivo ? 'abb-attivo' : 'abb-inattivo'}">${a.attivo ? 'Attivo' : 'Inattivo'}</span>`;
+    const descEsc = a.descrizione.replace(/'/g, "\\'");
+    const azioni = isCompletate
+      ? `<button class="btn btn-danger btn-sm" onclick="confermaEliminaAbb('${a.id}','${descEsc}')">🗑️</button>`
+      : `<button class="btn btn-ghost btn-sm" onclick="apriModificaAbbonamento('${a.id}')">✏️ Modifica</button>
+         ${a.attivo ? `<button class="btn btn-secondary btn-sm" onclick="addebitaOra('${a.id}')">💳 Addebita ora</button>` : `<button class="btn btn-primary btn-sm" onclick="apriRiattiva('${a.id}',${a.tipo === 'rata' ? 'true' : 'false'},${a.giorno_addebito})">↩️ Riattiva</button>`}
+         ${a.attivo ? `<button class="btn btn-danger btn-sm" onclick="confermaDisattivaAbb('${a.id}','${descEsc}')">⏹ Disattiva</button>` : ''}
+         <button class="btn btn-danger btn-sm" onclick="confermaEliminaAbb('${a.id}','${descEsc}')">🗑️</button>`;
+    return `<div class="abb-card">
+      <div class="abb-card-header">
+        <div class="abb-card-title">
+          <span style="font-size:18px">${cat.icona || '🔄'}</span>
+          <div>
+            <div class="abb-nome">${a.descrizione}</div>
+            <div class="abb-meta">Giorno ${a.giorno_addebito} · ${a.frequenza}</div>
+          </div>
+        </div>
+        <div class="abb-card-right">
+          <div class="abb-importo">${formatImporto(a.importo)}<span style="font-size:11px;color:var(--text2)">${freqLabel}</span></div>
+          ${badgeCompletata}
+        </div>
+      </div>
+      ${cat.nome ? `<div style="margin:6px 0"><span class="badge" style="background:${bg};color:${color}">${cat.icona || ''} ${cat.nome}</span></div>` : ''}
+      ${rateInfo}
+      ${a.note ? `<div style="font-size:12px;color:var(--text2);margin-top:4px">${a.note}</div>` : ''}
+      <div class="abb-actions">${azioni}</div>
+    </div>`;
+  }).join('');
+}
+
+document.querySelectorAll('.abb-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.abb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.filtroTipoAbb = btn.dataset.tipo;
+    renderListaAbbonamenti();
+  });
+});
+
+document.getElementById('btn-nuovo-abbonamento')?.addEventListener('click', () => apriModalAbbonamento());
+
+async function apriModalAbbonamento(id = null) {
+  state.abboModifica = id;
+  if (!state.categorie.length) state.categorie = await getCategorie();
+  const modal = document.getElementById('modal-abbonamento');
+  document.getElementById('modal-abb-titolo').textContent = id ? 'Modifica abbonamento' : 'Nuovo abbonamento';
+  document.getElementById('abb-id-hidden').value = id || '';
+
+  const selCat = document.getElementById('abb-categoria');
+  selCat.innerHTML = '<option value="">Nessuna</option>' +
+    state.categorie.map(c => `<option value="${c.id}">${c.icona || ''} ${c.nome}</option>`).join('');
+
+  if (id) {
+    const a = state.abbonamentiCorrente.find(x => x.id === id);
+    if (a) {
+      document.getElementById('abb-descrizione').value = a.descrizione;
+      document.getElementById('abb-importo').value = a.importo;
+      document.getElementById('abb-tipo').value = a.tipo || 'abbonamento';
+      document.getElementById('abb-frequenza').value = a.frequenza || 'mensile';
+      document.getElementById('abb-giorno').value = a.giorno_addebito || 1;
+      document.getElementById('abb-categoria').value = a.categoria_id || '';
+      document.getElementById('abb-n-rate').value = a.n_rate_totali || '';
+      document.getElementById('abb-note').value = a.note || '';
+      document.getElementById('abb-rate-group').style.display = a.tipo === 'rata' ? '' : 'none';
+    }
+  } else {
+    document.getElementById('abb-descrizione').value = '';
+    document.getElementById('abb-importo').value = '';
+    document.getElementById('abb-tipo').value = 'abbonamento';
+    document.getElementById('abb-frequenza').value = 'mensile';
+    document.getElementById('abb-giorno').value = new Date().getDate();
+    document.getElementById('abb-categoria').value = '';
+    document.getElementById('abb-n-rate').value = '';
+    document.getElementById('abb-note').value = '';
+    document.getElementById('abb-rate-group').style.display = 'none';
+  }
+  modal.classList.add('active');
+}
+
+window.apriModificaAbbonamento = apriModalAbbonamento;
+
+function aggiornaCalcRata() {
+  const tipo = document.getElementById('abb-tipo')?.value;
+  const importo = parseFloat(document.getElementById('abb-importo')?.value);
+  const nRate = parseInt(document.getElementById('abb-n-rate')?.value);
+  const helper = document.getElementById('abb-importo-helper');
+  // Aggiorna label campo importo
+  const labelImporto = document.getElementById('abb-importo')?.closest('.form-group')?.querySelector('label');
+  if (labelImporto) labelImporto.textContent = tipo === 'rata' ? 'Importo totale (€) *' : 'Importo (€) *';
+  if (!helper) return;
+  if (tipo === 'rata' && importo > 0 && nRate > 0) {
+    document.getElementById('abb-rata-calc').textContent = `€${(importo / nRate).toFixed(2)}`;
+    helper.style.display = 'block';
+  } else {
+    helper.style.display = 'none';
+  }
+}
+
+document.getElementById('abb-tipo')?.addEventListener('change', e => {
+  document.getElementById('abb-rate-group').style.display = e.target.value === 'rata' ? '' : 'none';
+  aggiornaCalcRata();
+});
+
+document.getElementById('abb-importo')?.addEventListener('input', aggiornaCalcRata);
+document.getElementById('abb-n-rate')?.addEventListener('input', aggiornaCalcRata);
+
+document.getElementById('modal-abbonamento')?.addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('modal-abbonamento').classList.remove('active');
+});
+document.getElementById('btn-chiudi-abb')?.addEventListener('click', () =>
+  document.getElementById('modal-abbonamento').classList.remove('active'));
+document.getElementById('btn-annulla-abb')?.addEventListener('click', () =>
+  document.getElementById('modal-abbonamento').classList.remove('active'));
+
+document.getElementById('btn-salva-abb')?.addEventListener('click', async () => {
+  const descrizione = document.getElementById('abb-descrizione').value.trim();
+  const importo = parseFloat(document.getElementById('abb-importo').value);
+  if (!descrizione || isNaN(importo) || importo <= 0) {
+    toast('Inserisci descrizione e importo valido', 'error');
+    return;
+  }
+  const tipo = document.getElementById('abb-tipo').value;
+  const payload = {
+    descrizione,
+    importo,
+    tipo,
+    frequenza: document.getElementById('abb-frequenza').value,
+    giorno_addebito: parseInt(document.getElementById('abb-giorno').value) || 1,
+    categoria_id: document.getElementById('abb-categoria').value || null,
+    note: document.getElementById('abb-note').value.trim(),
+  };
+  if (tipo === 'rata') {
+    const nRate = parseInt(document.getElementById('abb-n-rate').value);
+    if (nRate > 0) payload.n_rate_totali = nRate;
+  }
+  try {
+    const id = document.getElementById('abb-id-hidden').value;
+    if (id) {
+      await modificaAbbonamento(id, payload);
+      toast('Abbonamento modificato', 'success');
+    } else {
+      const creato = await creaAbbonamento(payload);
+      try {
+        await addebitaAbbonamento(creato.id);
+        toast('Abbonamento aggiunto — prima spesa addebitata', 'success');
+      } catch (errAbb) {
+        toast('Abbonamento aggiunto, ma addebito fallito: ' + errAbb.message, 'warning');
+      }
+    }
+    document.getElementById('modal-abbonamento').classList.remove('active');
+    state.abboModifica = null;
+    await fetchERenderAbbonamenti();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+});
+
+window.addebitaOra = async function(id) {
+  try {
+    await addebitaAbbonamento(id);
+    toast('Spesa addebitata con successo', 'success');
+    await fetchERenderAbbonamenti();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+};
+
+window.confermaDisattivaAbb = async function(id, nome) {
+  if (!confirm(`Disattivare "${nome}"? Dal prossimo ciclo non verrà più addebitato.`)) return;
+  try {
+    await disattivaAbbonamento(id);
+    toast('Abbonamento disattivato', 'success');
+    await fetchERenderAbbonamenti();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+};
+
+window.apriRiattiva = function(id, isRata, giornoAttuale) {
+  document.getElementById('riattiva-id').value = id;
+  document.getElementById('riattiva-giorno').value = giornoAttuale || 1;
+  const rateGroup = document.getElementById('riattiva-rate-group');
+  if (rateGroup) rateGroup.style.display = isRata === true || isRata === 'true' ? '' : 'none';
+  document.getElementById('riattiva-rate-pagate').value = 0;
+  document.getElementById('modal-riattiva').classList.add('active');
+};
+
+document.getElementById('btn-salva-riattiva')?.addEventListener('click', async () => {
+  const id = document.getElementById('riattiva-id').value;
+  const payload = {
+    giorno_addebito: parseInt(document.getElementById('riattiva-giorno').value) || 1,
+  };
+  const rateGroup = document.getElementById('riattiva-rate-group');
+  if (rateGroup && rateGroup.style.display !== 'none') {
+    payload.n_rate_pagate = parseInt(document.getElementById('riattiva-rate-pagate').value) || 0;
+  }
+  try {
+    await riativaAbbonamento(id, payload);
+    toast('Abbonamento riattivato', 'success');
+    document.getElementById('modal-riattiva').classList.remove('active');
+    await fetchERenderAbbonamenti();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+});
+
+['btn-chiudi-riattiva', 'btn-annulla-riattiva'].forEach(btnId => {
+  document.getElementById(btnId)?.addEventListener('click', () =>
+    document.getElementById('modal-riattiva').classList.remove('active'));
+});
+
+window.confermaEliminaAbb = async function(id, nome) {
+  if (!confirm(`Eliminare definitivamente "${nome}"?`)) return;
+  try {
+    await eliminaAbbonamento(id);
+    toast('Abbonamento eliminato', 'success');
+    await fetchERenderAbbonamenti();
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+};
+
 // ─── CONFIGURAZIONE ───────────────────────────────────────────────
 
 async function loadConfigurazione() {
@@ -617,8 +1122,6 @@ function populateBotModal() {
   const cfg = state.botConfig;
   const el = id => document.getElementById(id);
 
-  if (el('bot-token')) el('bot-token').value = cfg.token || '';
-  if (el('bot-chat-id')) el('bot-chat-id').value = cfg.chat_id || '';
   if (el('toggle-notif-giornaliera')) el('toggle-notif-giornaliera').checked = cfg.notifica_giornaliera !== false;
   if (el('toggle-notif-settimanale')) el('toggle-notif-settimanale').checked = cfg.notifica_settimanale !== false;
   if (el('toggle-alert-budget')) el('toggle-alert-budget').checked = cfg.alert_budget !== false;
@@ -630,11 +1133,10 @@ function populateBotModal() {
   });
 
   // Status connessione
-  const haToken = !!(cfg.token && cfg.token.length > 10);
   const dot = document.getElementById('bot-status-dot');
   const label = document.getElementById('bot-status-label');
-  if (dot) dot.className = `status-dot ${haToken ? 'online' : 'offline'}`;
-  if (label) label.textContent = haToken ? 'Bot configurato' : 'Token non configurato';
+  if (dot) dot.className = 'status-dot online';
+  if (label) label.textContent = 'Bot configurato';
 }
 
 document.querySelectorAll('.formato-btn').forEach(b => {
@@ -644,16 +1146,9 @@ document.querySelectorAll('.formato-btn').forEach(b => {
   });
 });
 
-document.getElementById('btn-toggle-token')?.addEventListener('click', () => {
-  const input = document.getElementById('bot-token');
-  input.type = input.type === 'password' ? 'text' : 'password';
-});
-
 document.getElementById('btn-salva-bot')?.addEventListener('click', async () => {
   const formatoAttivo = document.querySelector('.formato-btn.active')?.dataset.formato || 'dettagliato';
   const payload = {
-    token: document.getElementById('bot-token').value,
-    chat_id: document.getElementById('bot-chat-id').value,
     notifica_giornaliera: document.getElementById('toggle-notif-giornaliera').checked,
     notifica_settimanale: document.getElementById('toggle-notif-settimanale').checked,
     alert_budget: document.getElementById('toggle-alert-budget').checked,
@@ -709,6 +1204,15 @@ document.getElementById('btn-esegui-query')?.addEventListener('click', async () 
         </tbody>
       </table>
     `;
+    // Grafico opzionale
+    const flagGrafico = document.getElementById('query-flag-grafico');
+    const chartCont = document.getElementById('query-chart-container');
+    if (flagGrafico?.checked && spese.length) {
+      chartCont.style.display = 'block';
+      renderQueryChart(spese);
+    } else if (chartCont) {
+      chartCont.style.display = 'none';
+    }
   } catch (e) {
     toast('Errore query: ' + e.message, 'error');
   }

@@ -437,6 +437,22 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _salva_spesa(query, context, parsed, categoria)
         context.user_data.pop("spesa_pending", None)
 
+        # Auto-apprendimento: aggiunge la parola chiave alle regole della categoria
+        try:
+            descrizione = parsed.get("descrizione", "").lower().strip()
+            parola = descrizione.split()[0] if len(descrizione) > 10 else descrizione
+            if parola:
+                regole_esistenti = categoria.get("regole") or []
+                if parola not in [r.lower() for r in regole_esistenti]:
+                    nuove_regole = regole_esistenti + [parola]
+                    get_client().table("categorie").update({"regole": nuove_regole}).eq("id", categoria_id).execute()
+                    await query.message.reply_text(
+                        f"📚 Imparato: *{parola}* → {categoria['nome']}",
+                        parse_mode="Markdown",
+                    )
+        except Exception as e:
+            logger.warning(f"Auto-apprendimento fallito: {e}")
+
     elif data == "cancella_si":
         spesa = context.user_data.get("ultima_spesa")
         if not spesa:

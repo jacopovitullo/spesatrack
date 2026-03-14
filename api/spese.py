@@ -206,9 +206,42 @@ def statistiche():
             "media_giornaliera": round(media_giornaliera, 2),
             "categoria_top": categoria_top,
             "budget_rimanente": round(budget_globale - totale, 2),
+            "budget_globale": round(budget_globale, 2),
             "variazione_mese_precedente": variazione,
             "per_categoria": per_cat_list,
             "per_giorno": per_giorno_list,
         })
+    except Exception as e:
+        return _error(str(e), 500)
+
+
+@spese_bp.route("/statistiche/annuali", methods=["GET"])
+def statistiche_annuali():
+    try:
+        from datetime import date
+        from calendar import monthrange
+        oggi = date.today()
+        anno = int(request.args.get("anno", oggi.year))
+
+        MESI = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu",
+                "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]
+
+        db = get_client()
+        risultati = []
+        for mese in range(1, 13):
+            giorni = monthrange(anno, mese)[1]
+            data_da = f"{anno}-{mese:02d}-01"
+            data_a = f"{anno}-{mese:02d}-{giorni:02d}"
+            res = (
+                db.table("spese")
+                .select("importo")
+                .gte("data", data_da)
+                .lte("data", data_a)
+                .execute()
+            )
+            totale = sum(s["importo"] for s in (res.data or []))
+            risultati.append({"mese": mese, "nome": MESI[mese - 1], "totale": round(totale, 2)})
+
+        return jsonify(risultati)
     except Exception as e:
         return _error(str(e), 500)

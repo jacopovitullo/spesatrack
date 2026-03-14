@@ -58,6 +58,38 @@ CREATE INDEX IF NOT EXISTS idx_spese_data ON spese(data);
 CREATE INDEX IF NOT EXISTS idx_spese_categoria ON spese(categoria_id);
 CREATE INDEX IF NOT EXISTS idx_spese_fonte ON spese(fonte);
 
+-- Entrate
+CREATE TABLE IF NOT EXISTS entrate (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  descrizione TEXT NOT NULL,
+  importo NUMERIC(10,2) NOT NULL,
+  tipo TEXT DEFAULT 'altro',
+  data DATE DEFAULT CURRENT_DATE,
+  note TEXT DEFAULT '',
+  fonte TEXT DEFAULT 'web',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_entrate_data ON entrate(data);
+
+-- Abbonamenti e rate
+CREATE TABLE IF NOT EXISTS abbonamenti (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  descrizione TEXT NOT NULL,
+  importo NUMERIC(10,2) NOT NULL,
+  categoria_id UUID REFERENCES categorie(id) ON DELETE SET NULL,
+  tipo TEXT DEFAULT 'abbonamento',
+  frequenza TEXT DEFAULT 'mensile',
+  giorno_addebito INT DEFAULT 1,
+  attivo BOOLEAN DEFAULT TRUE,
+  data_inizio DATE DEFAULT CURRENT_DATE,
+  data_fine DATE,
+  n_rate_totali INT,
+  n_rate_pagate INT DEFAULT 0,
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_abbonamenti_attivo ON abbonamenti(attivo);
+
 -- ── Categorie di default ────────────────────────────────────────
 INSERT INTO categorie (nome, colore, icona, budget_mensile, regole) VALUES
   ('Cibo',          '#c8ff00', '🍕', 400,  ARRAY['supermercato','lidl','esselunga','pane','caffè','pranzo','cena','ristorante','pizza','colazione','bar']),
