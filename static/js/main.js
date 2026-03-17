@@ -1332,8 +1332,7 @@ document.getElementById('btn-salva-profilo')?.addEventListener('click', async ()
 
   try {
     await updateProfile(payload);
-    if (nome) document.getElementById('topbar-email').textContent =
-      document.getElementById('topbar-email').textContent; // invariato, email non cambia
+    if (nome) document.getElementById('topbar-nome').textContent = nome;
     document.getElementById('modal-profilo').classList.remove('active');
     toast('Profilo aggiornato', 'success');
   } catch (e) {

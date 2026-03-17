@@ -67,8 +67,14 @@
         <button class="btn btn-secondary" id="btn-bot">🤖 Bot</button>
         <button class="btn btn-primary" id="btn-nuova-spesa">+ Spesa</button>
         <div class="topbar-user">
+          <div class="theme-toggle" id="btn-theme" title="Cambia tema">
+            <span class="theme-toggle-icon" id="theme-icon">🌙</span>
+            <div class="theme-toggle-track">
+              <div class="theme-toggle-thumb"></div>
+            </div>
+          </div>
           <button class="btn btn-ghost btn-sm" id="btn-profilo" title="Profilo utente">
-            <span id="topbar-email">{{ user_email }}</span>
+            <span id="topbar-nome">{{ user_name or user_email }}</span>
           </button>
           {% if user_role == 'admin' %}
           <a href="/admin" class="btn btn-ghost btn-sm" title="Admin Panel">⚙️ Admin</a>
@@ -789,6 +795,25 @@
   </div>
 </div>
 
+<script>
+  // Tema: applica preferenza salvata prima del render per evitare flash
+  (function() {
+    if (localStorage.getItem('theme') === 'light') {
+      document.body.classList.add('light');
+    }
+  })();
+
+  document.getElementById('btn-theme').addEventListener('click', function() {
+    const isLight = document.body.classList.toggle('light');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    document.getElementById('theme-icon').textContent = isLight ? '☀️' : '🌙';
+  });
+
+  // Imposta icona corretta al caricamento
+  if (localStorage.getItem('theme') === 'light') {
+    document.getElementById('theme-icon').textContent = '☀️';
+  }
+</script>
 <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>
