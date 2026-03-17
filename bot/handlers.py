@@ -10,7 +10,7 @@ from telegram.ext import (
     filters,
     ContextTypes,
 )
-from db.client import get_client
+from supabase import create_client, Client
 from bot.formatter import (
     formato_compatto,
     formato_dettagliato,
@@ -21,19 +21,38 @@ from bot.formatter import (
 
 logger = logging.getLogger(__name__)
 
+# Cache client Supabase per chat_id (evita di ricreare il client ad ogni messaggio)
+_user_clients: dict[str, Client] = {}
+
+
+def _get_client_for_chat(chat_id: int | str) -> Client:
+    """Ritorna il client Supabase dell'utente con quel telegram_chat_id."""
+    key = str(chat_id)
+    if key not in _user_clients:
+        from auth.admin_client import get_admin_client
+        db = get_admin_client()
+        res = db.table('st_users').select('supabase_url, supabase_key').eq(
+            'telegram_chat_id', key).eq('is_active', True).limit(1).execute()
+        if not res.data:
+            raise LookupError(f"Nessun utente attivo trovato per chat_id {key}")
+        user = res.data[0]
+        _user_clients[key] = create_client(user['supabase_url'], user['supabase_key'])
+    return _user_clients[key]
+
+
 # ─── Utility ────────────────────────────────────────────────────────────────
 
-def _get_bot_config() -> dict:
+def _get_bot_config(chat_id: int | str) -> dict:
     try:
-        res = get_client().table("bot_config").select("*").eq("id", 1).execute()
+        res = _get_client_for_chat(chat_id).table("bot_config").select("*").eq("id", 1).execute()
         return res.data[0] if res.data else {}
     except Exception:
         return {}
 
 
-def _get_categorie() -> list:
+def _get_categorie(chat_id: int | str) -> list:
     try:
-        res = get_client().table("categorie").select("*").execute()
+        res = _get_client_for_chat(chat_id).table("categorie").select("*").execute()
         return res.data or []
     except Exception:
         return []
@@ -107,10 +126,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_oggi(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     oggi = date.today().isoformat()
     try:
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("*, categorie(nome, icona)")
             .eq("data", oggi)
@@ -135,11 +155,12 @@ async def cmd_oggi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_settimana(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     oggi = date.today()
     sette_giorni_fa = (oggi - timedelta(days=7)).isoformat()
     try:
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("*, categorie(nome, icona, colore)")
             .gte("data", sette_giorni_fa)
@@ -171,11 +192,13 @@ async def cmd_settimana(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_mese(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     oggi = date.today()
     primo_mese = date(oggi.year, oggi.month, 1).isoformat()
     try:
+        client = _get_client_for_chat(chat_id)
         res_spese = (
-            get_client()
+            client
             .table("spese")
             .select("*, categorie(nome, icona)")
             .gte("data", primo_mese)
@@ -186,7 +209,7 @@ async def cmd_mese(update: Update, context: ContextTypes.DEFAULT_TYPE):
         totale = sum(s["importo"] for s in spese)
 
         # Config app per budget globale
-        res_cfg = get_client().table("app_config").select("*").eq("id", 1).execute()
+        res_cfg = client.table("app_config").select("*").eq("id", 1).execute()
         budget_globale = res_cfg.data[0]["budget_mensile_globale"] if res_cfg.data else 1500
 
         # Per categoria
@@ -210,7 +233,7 @@ async def cmd_mese(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
         }
 
-        cfg_bot = _get_bot_config()
+        cfg_bot = _get_bot_config(chat_id)
         fmt = cfg_bot.get("formato_riepilogo", "dettagliato")
         if fmt == "compatto":
             testo = formato_compatto(stats)
@@ -226,12 +249,13 @@ async def cmd_mese(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     oggi = date.today()
     primo_mese = date(oggi.year, oggi.month, 1).isoformat()
     try:
-        categorie = _get_categorie()
+        categorie = _get_categorie(chat_id)
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("importo, categoria_id")
             .gte("data", primo_mese)
@@ -262,9 +286,10 @@ async def cmd_budget(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     try:
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("*, categorie(nome, icona)")
             .order("created_at", desc=True)
@@ -287,9 +312,10 @@ async def cmd_lista(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_cancella(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     try:
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("*")
             .order("created_at", desc=True)
@@ -318,13 +344,14 @@ async def cmd_cancella(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_cerca(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     query = " ".join(context.args) if context.args else ""
     if not query:
         await update.message.reply_text("Uso: /cerca <testo>")
         return
     try:
         res = (
-            get_client()
+            _get_client_for_chat(chat_id)
             .table("spese")
             .select("*, categorie(nome, icona)")
             .ilike("descrizione", f"%{query}%")
@@ -350,6 +377,7 @@ async def cmd_cerca(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ─── Handler messaggi liberi ─────────────────────────────────────────────────
 
 async def handle_messaggio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
     testo = update.message.text.strip()
     parsed = _parse_messaggio(testo)
     if not parsed or not parsed["descrizione"] or parsed["importo"] <= 0:
@@ -359,7 +387,13 @@ async def handle_messaggio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    categorie = _get_categorie()
+    try:
+        _get_client_for_chat(chat_id)  # verifica che l'utente esista
+    except LookupError:
+        await update.message.reply_text("❌ Utente non riconosciuto. Contatta l'amministratore.")
+        return
+
+    categorie = _get_categorie(chat_id)
     categoria = None
 
     # Prova prima con l'hint esplicito
@@ -374,10 +408,11 @@ async def handle_messaggio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         categoria = _auto_categoria(parsed["descrizione"], categorie)
 
     if categoria:
-        await _salva_spesa(update, context, parsed, categoria)
+        await _salva_spesa(update, context, parsed, categoria, chat_id)
     else:
         # Chiedi categoria con tastiera inline
         context.user_data["spesa_pending"] = parsed
+        context.user_data["spesa_pending_chat_id"] = chat_id
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton(f"{c.get('icona','📦')} {c['nome']}", callback_data=f"cat_{c['id']}")]
             for c in categorie
@@ -389,7 +424,7 @@ async def handle_messaggio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-async def _salva_spesa(update: Update, context: ContextTypes.DEFAULT_TYPE, parsed: dict, categoria: dict):
+async def _salva_spesa(update: Update, context: ContextTypes.DEFAULT_TYPE, parsed: dict, categoria: dict, chat_id: int | str):
     try:
         nuova_spesa = {
             "descrizione": parsed["descrizione"],
@@ -399,10 +434,10 @@ async def _salva_spesa(update: Update, context: ContextTypes.DEFAULT_TYPE, parse
             "fonte": "telegram",
             "note": parsed.get("nota", ""),
         }
-        res = get_client().table("spese").insert(nuova_spesa).execute()
+        res = _get_client_for_chat(chat_id).table("spese").insert(nuova_spesa).execute()
         spesa = res.data[0] if res.data else nuova_spesa
 
-        cfg_bot = _get_bot_config()
+        cfg_bot = _get_bot_config(chat_id)
         if cfg_bot.get("conferma_inserimento", True):
             icona = categoria.get("icona", "📦")
             await update.message.reply_text(
@@ -425,17 +460,19 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("cat_"):
         categoria_id = data[4:]
         parsed = context.user_data.get("spesa_pending")
+        chat_id = context.user_data.get("spesa_pending_chat_id") or query.message.chat_id
         if not parsed:
             await query.edit_message_text("⚠️ Sessione scaduta, reinserisci la spesa.")
             return
-        categorie = _get_categorie()
+        categorie = _get_categorie(chat_id)
         categoria = next((c for c in categorie if c["id"] == categoria_id), None)
         if not categoria:
             await query.edit_message_text("❌ Categoria non trovata.")
             return
         await query.edit_message_text(f"✅ Categoria selezionata: {categoria.get('icona','')} {categoria['nome']}")
-        await _salva_spesa(query, context, parsed, categoria)
+        await _salva_spesa(query, context, parsed, categoria, chat_id)
         context.user_data.pop("spesa_pending", None)
+        context.user_data.pop("spesa_pending_chat_id", None)
 
         # Auto-apprendimento: aggiunge la parola chiave alle regole della categoria
         try:
@@ -445,7 +482,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 regole_esistenti = categoria.get("regole") or []
                 if parola not in [r.lower() for r in regole_esistenti]:
                     nuove_regole = regole_esistenti + [parola]
-                    get_client().table("categorie").update({"regole": nuove_regole}).eq("id", categoria_id).execute()
+                    _get_client_for_chat(chat_id).table("categorie").update({"regole": nuove_regole}).eq("id", categoria_id).execute()
                     await query.message.reply_text(
                         f"📚 Imparato: *{parola}* → {categoria['nome']}",
                         parse_mode="Markdown",
@@ -455,11 +492,12 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "cancella_si":
         spesa = context.user_data.get("ultima_spesa")
+        chat_id = query.message.chat_id
         if not spesa:
             await query.edit_message_text("⚠️ Nessuna spesa da cancellare.")
             return
         try:
-            get_client().table("spese").delete().eq("id", spesa["id"]).execute()
+            _get_client_for_chat(chat_id).table("spese").delete().eq("id", spesa["id"]).execute()
             await query.edit_message_text(
                 f"🗑️ Spesa cancellata: *{spesa['descrizione']}* — {formato_importo(spesa['importo'])}",
                 parse_mode="Markdown",
