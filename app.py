@@ -79,47 +79,79 @@ def index(path):
 
 # ─── Bot Telegram ─────────────────────────────────────────────────
 
-def avvia_bot():
-    """Avvia il bot Telegram in un thread separato."""
-    if not TELEGRAM_TOKEN or len(TELEGRAM_TOKEN) < 10:
-        print("   Bot Telegram: ⚠️  TOKEN non configurato (imposta TELEGRAM_TOKEN nel .env)")
-        return
+def avvia_bot_per_utente(user: dict):
+    """Avvia il bot Telegram per un singolo utente (thread dedicato)."""
+    token = user.get('telegram_token', '')
+    email = user.get('email', user.get('id', '?'))
 
     async def _run():
+        from supabase import create_client
         from bot.handlers import build_application
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        telegram_app = build_application(TELEGRAM_TOKEN)
-        scheduler = None
+        client = create_client(user['supabase_url'], user['supabase_key'])
+        telegram_app = build_application(token, client)
         try:
             await telegram_app.initialize()
             await telegram_app.start()
             await telegram_app.updater.start_polling(drop_pending_updates=True)
             me = await telegram_app.bot.get_me()
-            print(f"   Bot Telegram: @{me.username} ✅ connesso", flush=True)
-
-            # Scheduler notifiche e addebito abbonamenti
-            scheduler = AsyncIOScheduler()
-            scheduler.add_job(_notifica_giornaliera_tutti, 'cron', hour=21, minute=0)
-            scheduler.add_job(_notifica_settimanale_tutti, 'cron', day_of_week='mon', hour=9, minute=0)
-            scheduler.add_job(_addebita_abbonamenti_tutti, 'cron', hour=8, minute=0)
-            scheduler.start()
-            print("   Scheduler notifiche: ✅ attivo", flush=True)
-
+            print(f"   Bot @{me.username} ({email}) ✅", flush=True)
             while True:
                 await asyncio.sleep(3600)
         except Exception as e:
-            print(f"   Bot Telegram: ❌ errore — {e}", flush=True)
+            print(f"   Bot ({email}): ❌ errore — {e}", flush=True)
         finally:
-            if scheduler and scheduler.running:
-                scheduler.shutdown()
-            await telegram_app.updater.stop()
-            await telegram_app.stop()
-            await telegram_app.shutdown()
+            try:
+                await telegram_app.updater.stop()
+                await telegram_app.stop()
+                await telegram_app.shutdown()
+            except Exception:
+                pass
 
     try:
         asyncio.run(_run())
     except Exception as e:
-        print(f"   Bot Telegram: ❌ errore avvio — {e}", flush=True)
+        print(f"   Bot avvio ({email}): ❌ — {e}", flush=True)
+
+
+def avvia_scheduler():
+    """Avvia lo scheduler notifiche in un thread dedicato."""
+    async def _run():
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        scheduler = AsyncIOScheduler()
+        scheduler.add_job(_notifica_giornaliera_tutti, 'cron', hour=21, minute=0)
+        scheduler.add_job(_notifica_settimanale_tutti, 'cron', day_of_week='mon', hour=9, minute=0)
+        scheduler.add_job(_addebita_abbonamenti_tutti, 'cron', hour=8, minute=0)
+        scheduler.start()
+        print("   Scheduler notifiche: ✅ attivo", flush=True)
+        while True:
+            await asyncio.sleep(3600)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        print(f"   Scheduler: ❌ errore — {e}", flush=True)
+
+
+def avvia_tutti_i_bot():
+    """Carica tutti gli utenti attivi con telegram_token e avvia un bot per ciascuno."""
+    from auth.admin_client import get_admin_client
+    try:
+        users = get_admin_client().table('st_users').select(
+            'id, email, supabase_url, supabase_key, telegram_token'
+        ).eq('is_active', True).execute()
+
+        bot_count = 0
+        for user in (users.data or []):
+            if not user.get('telegram_token') or len(user['telegram_token']) < 10:
+                continue
+            t = threading.Thread(target=avvia_bot_per_utente, args=(user,), daemon=True)
+            t.start()
+            bot_count += 1
+
+        if bot_count == 0:
+            print("   Bot Telegram: ⚠️  Nessun utente con token configurato", flush=True)
+    except Exception as e:
+        print(f"   Bot Telegram: ❌ errore caricamento utenti — {e}", flush=True)
 
 
 async def _addebita_abbonamenti_tutti():
@@ -326,9 +358,11 @@ if __name__ == '__main__':
     print("🚀 SpesaTrack avviato!")
     print(f"   App web: http://localhost:{FLASK_PORT}")
 
-    # Avvia bot in thread daemon
-    bot_thread = threading.Thread(target=avvia_bot, daemon=True)
-    bot_thread.start()
+    # Avvia scheduler notifiche
+    threading.Thread(target=avvia_scheduler, daemon=True).start()
+
+    # Avvia un bot per ogni utente con telegram_token
+    avvia_tutti_i_bot()
 
     # Avvia Flask
     app.run(
