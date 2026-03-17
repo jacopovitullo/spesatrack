@@ -31,6 +31,48 @@ body.light {
   --green: #16a34a;
 }
 
+/* ── LIGHT MODE OVERRIDES (fix hardcoded dark-theme values) ── */
+body.light .btn-primary { color: #fff; }
+body.light .btn-primary:hover { background: #5b21b6; }
+body.light .btn-secondary { background: #fff; }
+
+body.light .nav-item.active { background: rgba(109, 40, 217, 0.08); }
+
+body.light .export-card:hover { background: rgba(109, 40, 217, 0.04); }
+
+body.light .formato-btn.active {
+  background: rgba(109, 40, 217, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body.light .toggle input:checked + .toggle-slider { background: rgba(109, 40, 217, 0.25); }
+body.light .toggle input:checked + .toggle-slider::before { background: var(--accent); }
+
+body.light .pagination button.active { color: #fff; }
+
+body.light tbody tr { border-bottom: 1px solid var(--border); }
+
+body.light .chart-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.light .abb-tab.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.light .modal { box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15); }
+
+body.light .kpi-badge.up { background: rgba(220, 38, 38, 0.1); }
+body.light .kpi-badge.down { background: rgba(22, 163, 74, 0.1); }
+
+body.light .abb-attivo { background: rgba(22, 163, 74, 0.12); }
+body.light .abb-inattivo { background: rgba(107, 107, 136, 0.1); }
+
 /* ── THEME TOGGLE ──────────────────────────────────── */
 .theme-toggle {
   display: flex;

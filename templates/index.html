@@ -807,6 +807,7 @@
     const isLight = document.body.classList.toggle('light');
     localStorage.setItem('theme', isLight ? 'light' : 'dark');
     document.getElementById('theme-icon').textContent = isLight ? '☀️' : '🌙';
+    window.dispatchEvent(new Event('themechange'));
   });
 
   // Imposta icona corretta al caricamento

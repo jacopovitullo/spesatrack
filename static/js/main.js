@@ -110,6 +110,17 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ─── Theme change: ridisegna grafici pagina corrente ──────────────
+
+window.addEventListener('themechange', () => {
+  const activePage = document.querySelector('.page.active');
+  if (!activePage) return;
+  const pageId = activePage.id.replace('page-', '');
+  if (['dashboard', 'entrate'].includes(pageId)) {
+    onPageActivate(pageId);
+  }
+});
+
 // ─── Navigazione mese ─────────────────────────────────────────────
 
 document.getElementById('btn-prev-month')?.addEventListener('click', () => {

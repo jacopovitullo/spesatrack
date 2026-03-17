@@ -14,6 +14,59 @@ const CHART_DEFAULTS = {
 Chart.defaults.font.family = CHART_DEFAULTS.font.family;
 Chart.defaults.color = CHART_DEFAULTS.color;
 
+// ── Theme helpers ─────────────────────────────────────────────────
+
+function isLight() {
+  return document.body.classList.contains('light');
+}
+
+function themeColors() {
+  const light = isLight();
+  return {
+    // Tick / label color
+    tickColor:     light ? '#6b6b88' : '#7a7a9a',
+    // Grid lines
+    gridColor:     light ? 'rgba(176, 176, 200, 0.5)' : 'rgba(42,42,56,0.5)',
+    // Tooltip
+    tooltipBg:     light ? '#ffffff' : '#1c1c26',
+    tooltipBorder: light ? '#d0d0e0' : '#2a2a38',
+    tooltipText:   light ? '#111118' : '#e8e8f0',
+    // Bar chart (spese giornaliere / annuali)
+    barFill:       light ? 'rgba(109, 40, 217, 0.18)' : 'rgba(200, 255, 0, 0.15)',
+    barBorder:     light ? '#6d28d9'                  : '#c8ff00',
+    // Entrate chart
+    entrateFill:   light ? 'rgba(22, 163, 74, 0.18)'  : 'rgba(0, 212, 255, 0.15)',
+    entrateBorder: light ? '#16a34a'                  : '#00d4ff',
+    // Query chart
+    queryFill:     light ? 'rgba(79, 70, 229, 0.18)'  : 'rgba(124, 109, 250, 0.15)',
+    queryBorder:   light ? '#4f46e5'                  : '#7c6dfa',
+  };
+}
+
+function makeScales(tc) {
+  return {
+    x: {
+      grid: { color: tc.gridColor, drawBorder: false },
+      ticks: { color: tc.tickColor },
+    },
+    y: {
+      grid: { color: tc.gridColor, drawBorder: false },
+      ticks: { color: tc.tickColor, callback: v => `€${v}` },
+      beginAtZero: true,
+    },
+  };
+}
+
+function makeTooltip(tc) {
+  return {
+    backgroundColor: tc.tooltipBg,
+    borderColor: tc.tooltipBorder,
+    borderWidth: 1,
+    titleColor: tc.tooltipText,
+    bodyColor: tc.tooltipText,
+  };
+}
+
 // ── Grafico a barre — andamento giornaliero ───────────────────────
 
 export function renderBarChart(datiPerGiorno) {
@@ -28,6 +81,10 @@ export function renderBarChart(datiPerGiorno) {
 
   if (chartBar) chartBar.destroy();
 
+  const tc = themeColors();
+  const scales = makeScales(tc);
+  scales.x.ticks = { ...scales.x.ticks, maxTicksLimit: 10 };
+
   chartBar = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -35,8 +92,8 @@ export function renderBarChart(datiPerGiorno) {
       datasets: [{
         label: 'Spese (€)',
         data: valori,
-        backgroundColor: 'rgba(200, 255, 0, 0.15)',
-        borderColor: '#c8ff00',
+        backgroundColor: tc.barFill,
+        borderColor: tc.barBorder,
         borderWidth: 1.5,
         borderRadius: 4,
         borderSkipped: false,
@@ -48,25 +105,11 @@ export function renderBarChart(datiPerGiorno) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1c1c26',
-          borderColor: '#2a2a38',
-          borderWidth: 1,
-          callbacks: {
-            label: ctx => `€${ctx.parsed.y.toFixed(2)}`,
-          },
+          ...makeTooltip(tc),
+          callbacks: { label: ctx => `€${ctx.parsed.y.toFixed(2)}` },
         },
       },
-      scales: {
-        x: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-          ticks: { maxTicksLimit: 10 },
-        },
-        y: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-          ticks: { callback: v => `€${v}` },
-          beginAtZero: true,
-        },
-      },
+      scales,
     },
   });
 }
@@ -82,6 +125,8 @@ export function renderAnnualChart(datiPerMese) {
 
   if (chartBar) chartBar.destroy();
 
+  const tc = themeColors();
+
   chartBar = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -89,8 +134,8 @@ export function renderAnnualChart(datiPerMese) {
       datasets: [{
         label: 'Spese (€)',
         data: valori,
-        backgroundColor: 'rgba(200, 255, 0, 0.15)',
-        borderColor: '#c8ff00',
+        backgroundColor: tc.barFill,
+        borderColor: tc.barBorder,
         borderWidth: 1.5,
         borderRadius: 4,
         borderSkipped: false,
@@ -102,24 +147,11 @@ export function renderAnnualChart(datiPerMese) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1c1c26',
-          borderColor: '#2a2a38',
-          borderWidth: 1,
-          callbacks: {
-            label: ctx => `€${ctx.parsed.y.toFixed(2)}`,
-          },
+          ...makeTooltip(tc),
+          callbacks: { label: ctx => `€${ctx.parsed.y.toFixed(2)}` },
         },
       },
-      scales: {
-        x: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-        },
-        y: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-          ticks: { callback: v => `€${v}` },
-          beginAtZero: true,
-        },
-      },
+      scales: makeScales(tc),
     },
   });
 }
@@ -135,6 +167,8 @@ export function renderAnnualEntryChart(datiPerMese) {
 
   if (chartBarEntrate) chartBarEntrate.destroy();
 
+  const tc = themeColors();
+
   chartBarEntrate = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -142,8 +176,8 @@ export function renderAnnualEntryChart(datiPerMese) {
       datasets: [{
         label: 'Entrate (€)',
         data: valori,
-        backgroundColor: 'rgba(0, 212, 255, 0.15)',
-        borderColor: '#00d4ff',
+        backgroundColor: tc.entrateFill,
+        borderColor: tc.entrateBorder,
         borderWidth: 1.5,
         borderRadius: 4,
         borderSkipped: false,
@@ -155,24 +189,11 @@ export function renderAnnualEntryChart(datiPerMese) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1c1c26',
-          borderColor: '#2a2a38',
-          borderWidth: 1,
-          callbacks: {
-            label: ctx => `€${ctx.parsed.y.toFixed(2)}`,
-          },
+          ...makeTooltip(tc),
+          callbacks: { label: ctx => `€${ctx.parsed.y.toFixed(2)}` },
         },
       },
-      scales: {
-        x: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-        },
-        y: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-          ticks: { callback: v => `€${v}` },
-          beginAtZero: true,
-        },
-      },
+      scales: makeScales(tc),
     },
   });
 }
@@ -199,6 +220,8 @@ export function renderQueryChart(spese) {
 
   if (chartQuery) chartQuery.destroy();
 
+  const tc = themeColors();
+
   chartQuery = new Chart(ctx, {
     type: 'bar',
     data: {
@@ -206,8 +229,8 @@ export function renderQueryChart(spese) {
       datasets: [{
         label: 'Spese (€)',
         data: valori,
-        backgroundColor: 'rgba(124, 109, 250, 0.15)',
-        borderColor: '#7c6dfa',
+        backgroundColor: tc.queryFill,
+        borderColor: tc.queryBorder,
         borderWidth: 1.5,
         borderRadius: 4,
         borderSkipped: false,
@@ -219,22 +242,11 @@ export function renderQueryChart(spese) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1c1c26',
-          borderColor: '#2a2a38',
-          borderWidth: 1,
-          callbacks: {
-            label: ctx => `€${ctx.parsed.y.toFixed(2)}`,
-          },
+          ...makeTooltip(tc),
+          callbacks: { label: ctx => `€${ctx.parsed.y.toFixed(2)}` },
         },
       },
-      scales: {
-        x: { grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false } },
-        y: {
-          grid: { color: 'rgba(42,42,56,0.5)', drawBorder: false },
-          ticks: { callback: v => `€${v}` },
-          beginAtZero: true,
-        },
-      },
+      scales: makeScales(tc),
     },
   });
 }
@@ -253,6 +265,8 @@ export function renderDoughnutChart(perCategoria) {
 
   if (chartDoughnut) chartDoughnut.destroy();
 
+  const tc = themeColors();
+
   chartDoughnut = new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -260,8 +274,8 @@ export function renderDoughnutChart(perCategoria) {
       datasets: [{
         data: valori,
         backgroundColor: colori.map(c => c + '99'),
-        borderColor: colori,
-        borderWidth: 2,
+        borderColor: isLight() ? colori.map(c => c) : colori,
+        borderWidth: isLight() ? 2.5 : 2,
         hoverOffset: 6,
       }],
     },
@@ -276,12 +290,11 @@ export function renderDoughnutChart(perCategoria) {
             boxWidth: 10,
             padding: 12,
             font: { size: 11 },
+            color: tc.tickColor,
           },
         },
         tooltip: {
-          backgroundColor: '#1c1c26',
-          borderColor: '#2a2a38',
-          borderWidth: 1,
+          ...makeTooltip(tc),
           callbacks: {
             label: ctx => {
               const tot = ctx.dataset.data.reduce((a, b) => a + b, 0);
