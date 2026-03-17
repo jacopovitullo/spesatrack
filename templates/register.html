@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SpesaTrack — Registrazione</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    html, body { overflow: auto; }
+    .auth-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .auth-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 520px;
+    }
+    .auth-logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .auth-subtitle {
+      color: var(--text2);
+      font-size: 13px;
+      margin-bottom: 28px;
+    }
+    .section-label {
+      font-family: 'Syne', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      margin: 24px 0 12px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .section-label:first-of-type { margin-top: 0; }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .form-group input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color var(--transition);
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .form-group .hint {
+      font-size: 11px;
+      color: var(--text2);
+      margin-top: 4px;
+    }
+    .schema-info {
+      background: rgba(200,255,0,0.06);
+      border: 1px solid rgba(200,255,0,0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 20px;
+      line-height: 1.7;
+    }
+    .schema-toggle {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 0;
+      margin-top: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .schema-toggle:hover { opacity: 0.8; }
+    .schema-block {
+      display: none;
+      margin-top: 10px;
+      position: relative;
+    }
+    .schema-block pre {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      font-size: 11px;
+      overflow-x: auto;
+      max-height: 200px;
+      overflow-y: auto;
+      color: var(--text2);
+      margin: 0;
+      line-height: 1.5;
+    }
+    .btn-copy-schema {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: var(--accent);
+      color: #0a0a0f;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: opacity var(--transition);
+    }
+    .btn-copy-schema:hover { opacity: 0.8; }
+    .btn-auth {
+      width: 100%;
+      background: var(--accent);
+      color: #0a0a0f;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: opacity var(--transition);
+    }
+    .btn-auth:hover { opacity: 0.85; }
+    .auth-error {
+      background: rgba(255,71,87,0.12);
+      border: 1px solid var(--red);
+      border-radius: var(--radius-sm);
+      color: var(--red);
+      font-size: 13px;
+      padding: 10px 12px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-logo">💸 SpesaTrack</div>
+      <div class="auth-subtitle">Crea il tuo account con il link di invito</div>
+
+      {% if error %}
+      <div class="auth-error">{{ error }}</div>
+      {% endif %}
+
+      <div class="schema-info">
+        ⚠️ <strong>Prima di procedere</strong>, esegui lo schema del database nel tuo progetto Supabase.<br>
+        Vai su <strong>Supabase → SQL Editor</strong>, incolla il codice qui sotto e premi <strong>Run</strong>.
+        <button class="schema-toggle" type="button" onclick="toggleSchema(this)">▶ Mostra SQL schema</button>
+        <div class="schema-block" id="schema-block">
+          <button class="btn-copy-schema" type="button" onclick="copySchema(this)">Copia</button>
+          <pre id="schema-sql">-- ============================================================
+-- SpesaTrack — Schema Supabase (tabelle utente)
+-- Incolla nella SQL Editor del tuo progetto Supabase e premi Run
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS categorie (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  nome TEXT NOT NULL,
+  colore TEXT DEFAULT '#c8ff00',
+  icona TEXT DEFAULT '📦',
+  budget_mensile NUMERIC(10,2) DEFAULT 0,
+  regole TEXT[] DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS spese (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  descrizione TEXT NOT NULL,
+  importo NUMERIC(10,2) NOT NULL,
+  categoria_id UUID REFERENCES categorie(id) ON DELETE SET NULL,
+  data DATE DEFAULT CURRENT_DATE,
+  fonte TEXT DEFAULT 'web',
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bot_config (
+  id INT DEFAULT 1 PRIMARY KEY,
+  token TEXT DEFAULT '',
+  chat_id TEXT DEFAULT '',
+  notifica_giornaliera BOOLEAN DEFAULT TRUE,
+  ora_giornaliera TIME DEFAULT '21:00',
+  notifica_settimanale BOOLEAN DEFAULT TRUE,
+  ora_settimanale TIME DEFAULT '09:00',
+  alert_budget BOOLEAN DEFAULT TRUE,
+  conferma_inserimento BOOLEAN DEFAULT TRUE,
+  formato_riepilogo TEXT DEFAULT 'dettagliato'
+);
+
+CREATE TABLE IF NOT EXISTS app_config (
+  id INT DEFAULT 1 PRIMARY KEY,
+  valuta TEXT DEFAULT 'EUR',
+  simbolo_valuta TEXT DEFAULT '€',
+  formato_data TEXT DEFAULT 'DD/MM/YYYY',
+  budget_mensile_globale NUMERIC(10,2) DEFAULT 1500
+);
+
+INSERT INTO bot_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+INSERT INTO app_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
+
+CREATE INDEX IF NOT EXISTS idx_spese_data ON spese(data);
+CREATE INDEX IF NOT EXISTS idx_spese_categoria ON spese(categoria_id);
+CREATE INDEX IF NOT EXISTS idx_spese_fonte ON spese(fonte);
+
+CREATE TABLE IF NOT EXISTS entrate (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  descrizione TEXT NOT NULL,
+  importo NUMERIC(10,2) NOT NULL,
+  tipo TEXT DEFAULT 'altro',
+  data DATE DEFAULT CURRENT_DATE,
+  note TEXT DEFAULT '',
+  fonte TEXT DEFAULT 'web',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_entrate_data ON entrate(data);
+
+CREATE TABLE IF NOT EXISTS abbonamenti (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  descrizione TEXT NOT NULL,
+  importo NUMERIC(10,2) NOT NULL,
+  categoria_id UUID REFERENCES categorie(id) ON DELETE SET NULL,
+  tipo TEXT DEFAULT 'abbonamento',
+  frequenza TEXT DEFAULT 'mensile',
+  giorno_addebito INT DEFAULT 1,
+  attivo BOOLEAN DEFAULT TRUE,
+  data_inizio DATE DEFAULT CURRENT_DATE,
+  data_fine DATE,
+  n_rate_totali INT,
+  n_rate_pagate INT DEFAULT 0,
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_abbonamenti_attivo ON abbonamenti(attivo);
+
+INSERT INTO categorie (nome, colore, icona, budget_mensile, regole) VALUES
+  ('Cibo',          '#c8ff00', '🍕', 400,  ARRAY['supermercato','lidl','esselunga','pane','caffè','pranzo','cena','ristorante','pizza','colazione','bar']),
+  ('Trasporti',     '#ff6b35', '🚗', 150,  ARRAY['benzina','metro','atm','treno','taxi','uber','autobus','trenitalia','bus','parking','parcheggio']),
+  ('Svago',         '#7c6dfa', '🎬', 200,  ARRAY['cinema','netflix','spotify','amazon','gioco','teatro','concerto','libro','fumetto','videogioco']),
+  ('Casa',          '#2ed573', '🏠', 500,  ARRAY['affitto','bolletta','luce','gas','acqua','internet','condominio','pulizie','ikea','arredamento']),
+  ('Salute',        '#ff4757', '💊', 100,  ARRAY['farmacia','medico','dentista','palestra','medicina','visita','analisi','ospedale']),
+  ('Abbigliamento', '#ffa502', '👕', 150,  ARRAY['zara','h&m','scarpe','vestiti','abbigliamento','camicia','pantaloni','saldi'])
+ON CONFLICT DO NOTHING;</pre>
+        </div>
+      </div>
+
+      <form method="POST" action="/register">
+        <input type="hidden" name="token" value="{{ token }}">
+
+        <div class="section-label">Account</div>
+
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" name="email" value="{{ email_hint }}" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label>Nome visualizzato</label>
+          <input type="text" name="display_name" placeholder="es. Mario Rossi">
+        </div>
+        <div class="form-group">
+          <label>Password * <span style="font-size:11px;color:var(--text2)">(min. 8 caratteri)</span></label>
+          <input type="password" name="password" required autocomplete="new-password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label>Conferma password *</label>
+          <input type="password" name="password_confirm" required autocomplete="new-password" minlength="8">
+        </div>
+
+        <div class="section-label">Supabase (il tuo account gratuito)</div>
+
+        <div class="form-group">
+          <label>Project URL *</label>
+          <input type="url" name="supabase_url" required placeholder="https://xxxxxxxxxxxx.supabase.co">
+          <div class="hint">Trova in: Supabase → Settings → API → Project URL</div>
+        </div>
+        <div class="form-group">
+          <label>Anon Key *</label>
+          <input type="text" name="supabase_key" required placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+          <div class="hint">Trova in: Supabase → Settings → API → Project API Keys → anon public</div>
+        </div>
+
+        <div class="section-label">Telegram Bot</div>
+
+        <div class="form-group">
+          <label>Bot Token *</label>
+          <input type="text" name="telegram_token" required placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz">
+          <div class="hint">Ottieni il token da @BotFather su Telegram</div>
+        </div>
+        <div class="form-group">
+          <label>Chat ID *</label>
+          <input type="text" name="telegram_chat_id" required placeholder="es. 492414069">
+          <div class="hint">Ottieni il tuo chat_id da @userinfobot su Telegram</div>
+        </div>
+
+        <button type="submit" class="btn-auth">Registrati</button>
+      </form>
+    </div>
+  </div>
+  <script>
+    function toggleSchema(btn) {
+      const block = document.getElementById('schema-block');
+      const open = block.style.display === 'block';
+      block.style.display = open ? 'none' : 'block';
+      btn.textContent = (open ? '▶' : '▼') + ' ' + (open ? 'Mostra' : 'Nascondi') + ' SQL schema';
+    }
+    function copySchema(btn) {
+      const sql = document.getElementById('schema-sql').textContent;
+      navigator.clipboard.writeText(sql).then(() => {
+        btn.textContent = '✓ Copiato!';
+        setTimeout(() => { btn.textContent = 'Copia'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

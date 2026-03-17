@@ -15,6 +15,10 @@ async function request(method, path, body = null) {
   const res = await fetch(BASE + path, opts);
   const data = await res.json().catch(() => ({}));
 
+  if (res.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Non autenticato');
+  }
   if (!res.ok) {
     throw new Error(data.error || `HTTP ${res.status}`);
   }
@@ -147,6 +151,16 @@ export async function addebitaAbbonamento(id) {
 
 export async function riativaAbbonamento(id, payload) {
   return request('PUT', `/abbonamenti/${id}/riattiva`, payload);
+}
+
+// ── Auth / Profilo ────────────────────────────────────────────────
+
+export async function getMe() {
+  return fetch('/api/auth/me').then(r => r.json());
+}
+
+export async function updateProfile(data) {
+  return request('PUT', '/auth/profile', data);
 }
 
 // ── Export ────────────────────────────────────────────────────────

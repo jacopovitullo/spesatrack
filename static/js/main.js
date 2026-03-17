@@ -10,6 +10,7 @@ import {
   getEntrate, creaEntrata, modificaEntrata, eliminaEntrata,
   getAbbonamenti, creaAbbonamento, modificaAbbonamento, eliminaAbbonamento,
   disattivaAbbonamento, addebitaAbbonamento, riativaAbbonamento,
+  getMe, updateProfile,
 } from './api.js';
 
 import { renderBarChart, renderAnnualChart, renderDoughnutChart, renderAnnualEntryChart, renderQueryChart } from './charts.js';
@@ -1275,6 +1276,70 @@ window.eliminaQuerySalvata = function(e, i) {
   localStorage.setItem('spesatrack_queries', JSON.stringify(state.salvataggioQuery));
   renderQuerySalvate();
 };
+
+// ─── MODAL PROFILO ────────────────────────────────────────────────
+
+document.getElementById('btn-profilo')?.addEventListener('click', async () => {
+  try {
+    const me = await getMe();
+    document.getElementById('profilo-nome').value = me.display_name || '';
+    // supabase e telegram non vengono pre-popolati per sicurezza
+    document.getElementById('profilo-supabase-url').value = '';
+    document.getElementById('profilo-supabase-key').value = '';
+    document.getElementById('profilo-tg-token').value = '';
+    document.getElementById('profilo-tg-chat').value = '';
+    document.getElementById('profilo-password').value = '';
+    document.getElementById('profilo-password-conf').value = '';
+    document.getElementById('modal-profilo').classList.add('active');
+  } catch (e) {
+    toast('Errore caricamento profilo: ' + e.message, 'error');
+  }
+});
+
+document.getElementById('btn-chiudi-profilo')?.addEventListener('click', () => {
+  document.getElementById('modal-profilo').classList.remove('active');
+});
+document.getElementById('btn-annulla-profilo')?.addEventListener('click', () => {
+  document.getElementById('modal-profilo').classList.remove('active');
+});
+
+document.getElementById('btn-salva-profilo')?.addEventListener('click', async () => {
+  const payload = {};
+  const nome      = document.getElementById('profilo-nome').value.trim();
+  const sbUrl     = document.getElementById('profilo-supabase-url').value.trim();
+  const sbKey     = document.getElementById('profilo-supabase-key').value.trim();
+  const tgToken   = document.getElementById('profilo-tg-token').value.trim();
+  const tgChat    = document.getElementById('profilo-tg-chat').value.trim();
+  const pwd       = document.getElementById('profilo-password').value;
+  const pwdConf   = document.getElementById('profilo-password-conf').value;
+
+  if (nome)    payload.display_name    = nome;
+  if (sbUrl)   payload.supabase_url    = sbUrl;
+  if (sbKey)   payload.supabase_key    = sbKey;
+  if (tgToken) payload.telegram_token  = tgToken;
+  if (tgChat)  payload.telegram_chat_id = tgChat;
+
+  if (pwd) {
+    if (pwd !== pwdConf) { toast('Le password non coincidono', 'error'); return; }
+    if (pwd.length < 8)  { toast('Password minimo 8 caratteri', 'error'); return; }
+    payload.password = pwd;
+  }
+
+  if (Object.keys(payload).length === 0) {
+    toast('Nessuna modifica da salvare', 'error');
+    return;
+  }
+
+  try {
+    await updateProfile(payload);
+    if (nome) document.getElementById('topbar-email').textContent =
+      document.getElementById('topbar-email').textContent; // invariato, email non cambia
+    document.getElementById('modal-profilo').classList.remove('active');
+    toast('Profilo aggiornato', 'success');
+  } catch (e) {
+    toast('Errore: ' + e.message, 'error');
+  }
+});
 
 // ─── INIT ─────────────────────────────────────────────────────────
 

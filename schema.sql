@@ -90,6 +90,40 @@ CREATE TABLE IF NOT EXISTS abbonamenti (
 );
 CREATE INDEX IF NOT EXISTS idx_abbonamenti_attivo ON abbonamenti(attivo);
 
+-- ============================================================
+-- Tabelle gestione utenti (admin Supabase — schema.sql utente NON include queste)
+-- Eseguire SOLO nel progetto Supabase dell'admin
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS st_users (
+  id               UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email            TEXT NOT NULL UNIQUE,
+  password_hash    TEXT NOT NULL,
+  display_name     TEXT DEFAULT '',
+  role             TEXT DEFAULT 'user',   -- 'admin' | 'user'
+  supabase_url     TEXT NOT NULL,
+  supabase_key     TEXT NOT NULL,
+  telegram_token   TEXT DEFAULT '',
+  telegram_chat_id TEXT DEFAULT '',
+  is_active        BOOLEAN DEFAULT TRUE,
+  created_at       TIMESTAMPTZ DEFAULT NOW(),
+  last_login_at    TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS st_invites (
+  id           UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  token        TEXT NOT NULL UNIQUE,
+  email_hint   TEXT DEFAULT '',
+  created_by   UUID REFERENCES st_users(id) ON DELETE SET NULL,
+  used_by      UUID REFERENCES st_users(id) ON DELETE SET NULL,
+  used_at      TIMESTAMPTZ,
+  expires_at   TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invites_token ON st_invites(token);
+CREATE INDEX IF NOT EXISTS idx_users_email ON st_users(email);
+
 -- ── Categorie di default ────────────────────────────────────────
 INSERT INTO categorie (nome, colore, icona, budget_mensile, regole) VALUES
   ('Cibo',          '#c8ff00', '🍕', 400,  ARRAY['supermercato','lidl','esselunga','pane','caffè','pranzo','cena','ristorante','pizza','colazione','bar']),

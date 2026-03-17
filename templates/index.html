@@ -66,6 +66,15 @@
         </div>
         <button class="btn btn-secondary" id="btn-bot">🤖 Bot</button>
         <button class="btn btn-primary" id="btn-nuova-spesa">+ Spesa</button>
+        <div class="topbar-user">
+          <button class="btn btn-ghost btn-sm" id="btn-profilo" title="Profilo utente">
+            <span id="topbar-email">{{ user_email }}</span>
+          </button>
+          {% if user_role == 'admin' %}
+          <a href="/admin" class="btn btn-ghost btn-sm" title="Admin Panel">⚙️ Admin</a>
+          {% endif %}
+          <a href="/logout" class="btn btn-ghost btn-sm" title="Esci">↩ Esci</a>
+        </div>
       </div>
     </header>
 
@@ -718,6 +727,64 @@
     <div class="modal-footer">
       <button class="btn btn-ghost" id="btn-annulla-riattiva">Annulla</button>
       <button class="btn btn-primary" id="btn-salva-riattiva">Riattiva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL PROFILO ──────────────────────────────── -->
+<div class="modal-overlay" id="modal-profilo">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <div class="modal-title">👤 Profilo utente</div>
+      <button class="modal-close" id="btn-chiudi-profilo">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div style="margin-bottom:20px">
+        <label class="form-label">Nome visualizzato</label>
+        <input type="text" class="form-input" id="profilo-nome" placeholder="es. Mario Rossi">
+      </div>
+
+      <div style="margin-bottom:20px">
+        <strong style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:block;margin-bottom:12px">Supabase</strong>
+        <div style="margin-bottom:12px">
+          <label class="form-label">Project URL</label>
+          <input type="url" class="form-input" id="profilo-supabase-url" placeholder="https://xxxx.supabase.co">
+        </div>
+        <div>
+          <label class="form-label">Anon Key</label>
+          <input type="text" class="form-input" id="profilo-supabase-key" placeholder="eyJhbGciOi...">
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px">
+        <strong style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:block;margin-bottom:12px">Telegram</strong>
+        <div style="margin-bottom:12px">
+          <label class="form-label">Bot Token</label>
+          <input type="text" class="form-input" id="profilo-tg-token" placeholder="1234567890:ABCdef...">
+        </div>
+        <div>
+          <label class="form-label">Chat ID</label>
+          <input type="text" class="form-input" id="profilo-tg-chat" placeholder="492414069">
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;border-top:1px solid var(--border);padding-top:20px">
+        <strong style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:block;margin-bottom:12px">Cambia password (opzionale)</strong>
+        <div style="margin-bottom:12px">
+          <label class="form-label">Nuova password</label>
+          <input type="password" class="form-input" id="profilo-password" placeholder="min. 8 caratteri">
+        </div>
+        <div>
+          <label class="form-label">Conferma password</label>
+          <input type="password" class="form-input" id="profilo-password-conf">
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="btn-annulla-profilo">Annulla</button>
+      <button class="btn btn-primary" id="btn-salva-profilo">Salva</button>
     </div>
   </div>
 </div>
