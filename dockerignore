@@ -1,0 +1,31 @@
+# Ambiente virtuale Python
+venv/
+.venv/
+env/
+
+# File di configurazione locale
+.env
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Git
+.git/
+.gitignore
+
+# Log
+*.log
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
