@@ -186,6 +186,12 @@ def register_submit():
     }).eq('token', token).execute()
 
     _set_session(new_user)
+
+    if new_user.get('telegram_token'):
+        import threading
+        from bot.runner import avvia_bot_per_utente
+        threading.Thread(target=avvia_bot_per_utente, args=(new_user,), daemon=True).start()
+
     return redirect(url_for('index'))
 
 

@@ -66,6 +66,13 @@ def deactivate_user(user_id: str):
 def activate_user(user_id: str):
     db = get_admin_client()
     db.table('st_users').update({'is_active': True}).eq('id', user_id).execute()
+    user_res = db.table('st_users').select(
+        'id, email, supabase_url, supabase_key, telegram_token'
+    ).eq('id', user_id).limit(1).execute()
+    if user_res.data and user_res.data[0].get('telegram_token'):
+        import threading
+        from bot.runner import avvia_bot_per_utente
+        threading.Thread(target=avvia_bot_per_utente, args=(user_res.data[0],), daemon=True).start()
     return jsonify({"ok": True})
 
 

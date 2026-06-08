@@ -79,38 +79,7 @@ def index(path):
 
 # ─── Bot Telegram ─────────────────────────────────────────────────
 
-def avvia_bot_per_utente(user: dict):
-    """Avvia il bot Telegram per un singolo utente (thread dedicato)."""
-    token = user.get('telegram_token', '')
-    email = user.get('email', user.get('id', '?'))
-
-    async def _run():
-        from supabase import create_client
-        from bot.handlers import build_application
-        client = create_client(user['supabase_url'], user['supabase_key'])
-        telegram_app = build_application(token, client)
-        try:
-            await telegram_app.initialize()
-            await telegram_app.start()
-            await telegram_app.updater.start_polling(drop_pending_updates=True)
-            me = await telegram_app.bot.get_me()
-            print(f"   Bot @{me.username} ({email}) ✅", flush=True)
-            while True:
-                await asyncio.sleep(3600)
-        except Exception as e:
-            print(f"   Bot ({email}): ❌ errore — {e}", flush=True)
-        finally:
-            try:
-                await telegram_app.updater.stop()
-                await telegram_app.stop()
-                await telegram_app.shutdown()
-            except Exception:
-                pass
-
-    try:
-        asyncio.run(_run())
-    except Exception as e:
-        print(f"   Bot avvio ({email}): ❌ — {e}", flush=True)
+from bot.runner import avvia_bot_per_utente
 
 
 def avvia_scheduler():
@@ -206,16 +175,28 @@ async def _addebita_abbonamenti_per_utente(supabase_url: str, supabase_key: str)
             db.table("spese")
             .select("id")
             .eq("fonte", "abbonamento")
-            .ilike("descrizione", abb["descrizione"])
+            .ilike("descrizione", f"%{abb['descrizione']}%")
             .eq("data", oggi_iso)
             .execute()
         )
         if check.data:
             continue
 
+        tipo = abb.get("tipo", "abbonamento")
+        if tipo == "rata" and abb.get("n_rate_totali"):
+            n_pagate_nuovo = (abb.get("n_rate_pagate") or 0) + 1
+            n_totali = int(abb["n_rate_totali"])
+            importo_addebito = round(float(abb["importo"]) / n_totali, 2)
+            descrizione = f"[Rata {n_pagate_nuovo}/{n_totali}] {abb['descrizione']}"
+        else:
+            n_pagate_nuovo = None
+            n_totali = None
+            importo_addebito = float(abb["importo"])
+            descrizione = f"[Abbonamento] {abb['descrizione']}"
+
         nuova_spesa = {
-            "descrizione": abb["descrizione"],
-            "importo": abb["importo"],
+            "descrizione": descrizione,
+            "importo": importo_addebito,
             "categoria_id": abb.get("categoria_id"),
             "data": oggi_iso,
             "fonte": "abbonamento",
@@ -224,11 +205,9 @@ async def _addebita_abbonamenti_per_utente(supabase_url: str, supabase_key: str)
         nuova_spesa = {k: v for k, v in nuova_spesa.items() if v is not None}
         db.table("spese").insert(nuova_spesa).execute()
 
-        if abb.get("tipo") == "rata":
-            n_pagate = (abb.get("n_rate_pagate") or 0) + 1
-            update_data = {"n_rate_pagate": n_pagate}
-            n_totali = abb.get("n_rate_totali")
-            if n_totali and n_pagate >= n_totali:
+        if tipo == "rata" and n_pagate_nuovo is not None:
+            update_data = {"n_rate_pagate": n_pagate_nuovo}
+            if n_totali and n_pagate_nuovo >= n_totali:
                 update_data["attivo"] = False
                 update_data["data_fine"] = oggi_iso
             db.table("abbonamenti").update(update_data).eq("id", abb["id"]).execute()
