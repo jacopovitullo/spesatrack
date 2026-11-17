@@ -4,6 +4,7 @@ Centralizzato qui per evitare import circolari tra app.py e auth/.
 """
 
 import asyncio
+import os
 import threading
 
 _active_bots: set[str] = set()
@@ -18,6 +19,13 @@ def avvia_bot_per_utente(user: dict):
     """
     token = user.get('telegram_token', '')
     email = user.get('email', user.get('id', '?'))
+
+    # Utenti il cui bot e' ascoltato da un altro programma (l'assistente sul server di casa):
+    # qui niente polling, che andrebbe in conflitto; le notifiche partono lo stesso.
+    solo_invio = {e.strip().lower() for e in os.getenv('BOT_SOLO_INVIO', '').split(',') if e.strip()}
+    if str(user.get('email', '')).lower() in solo_invio:
+        print(f"   Bot ({email}): solo invio, l'ascolto e' altrove", flush=True)
+        return
 
     with _lock:
         if token in _active_bots:
